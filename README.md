@@ -1,23 +1,32 @@
-# zkUlt - Zero-Knowledge Private Transfer System
+# zkToosh - Phase 6: Monero-Style Private Transfers
 
-**Privacy-preserving blockchain transfer system using PLONK proofs with Ethereum address support and nullifier-based replay protection.**
+**Production-ready zero-knowledge private transfer system with Monero-inspired stealth addresses, dual-key cryptography, and complete claiming flow on Ethereum.**
 
-[![Phase 5B](https://img.shields.io/badge/Phase%205B-Complete-brightgreen)]() [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-blue)]() [![PLONK](https://img.shields.io/badge/ZK-PLONK-purple)]()
+[![Phase 6](https://img.shields.io/badge/Phase%206-Complete-brightgreen)]() [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-blue)]() [![PLONK](https://img.shields.io/badge/ZK-PLONK-purple)]() [![Stealth](https://img.shields.io/badge/Stealth-Addresses-orange)]()
 
-## 🌟 Features
+## 🌟 Phase 6 Features
 
-- ✅ **Dual Account Model** - EOA (public) + ENA (encrypted private) balances (Phase 5A)
-- ✅ **Function Privacy** - Unified privateTransfer() for deposits, transfers, withdrawals (Phase 5B)
-- ✅ **Enhanced PLONK Circuit** - 11 public signals with encrypted balance tracking
-- ✅ **Ethereum Address Support** - Recipients as 160-bit hashed addresses
-- ✅ **Nullifier System** - Prevents replay attacks and double-spending (Phase 4)
-- ✅ **Hash-Based Claiming** - Recipients claim transfers privately
-- ✅ **Field Arithmetic Withdrawals** - Detects negative vPubDelta via wraparound
-- ✅ **Poseidon Encryption** - Symmetric encryption for ENA balances
-- ✅ **API Rate Limiting** - DoS protection (Phase 4)
-- ✅ **Privacy-Preserving** - Transfer amounts and balances remain private
-- ✅ **Fast Proof Generation** - ~1.2-1.8s per proof
-- ✅ **Sepolia Deployment** - Verified contracts on testnet
+### **Monero-Style Privacy System**
+- **Dual-Key Cryptography** - Separate view keys (scanning) and spend keys (claiming)
+- **Stealth Addresses** - Unique one-time addresses for each payment recipient
+- **Payment Scanning** - Recipients scan blockchain privately using view key
+- **Zero-Knowledge Claiming** - Claim payments without revealing identity
+- **Privacy-Enhanced Deposits** - Deposits don't create stealth payment noise
+
+### **Complete Privacy Flow**
+- ✅ **Deposit** - EOA → ENA (encrypted private balance)
+- ✅ **Transfer** - Create stealth payment with ephemeral keys
+- ✅ **Scan** - Detect incoming payments using view key (client-side)
+- ✅ **Claim** - Generate ZK proof to claim funds using spend key
+- ✅ **Withdraw** - ENA → EOA (back to public balance)
+
+### **Advanced Features**
+- ✅ **Merkle Tree Anonymity** - Pending transfers in anonymity set (20 levels, ~1M capacity)
+- ✅ **Range Proofs** - Amount validation without revealing values
+- ✅ **Encrypted Memos** - Private messages attached to transfers
+- ✅ **Balance Commitments** - Poseidon commitments for encrypted balances
+- ✅ **Nullifier System** - Replay attack prevention
+- ✅ **Rate Limiting** - DoS protection
 
 ## 🏗️ Architecture
 
@@ -27,30 +36,57 @@
 │   (React)   │      │  (Express)   │      │   (Sepolia)     │
 └─────────────┘      └──────────────┘      └─────────────────┘
       │                     │                       │
-      │                     ▼                       │
-      │            ┌──────────────┐                 │
-      │            │ PLONK Prover │                 │
-      │            │  (snarkjs)   │                 │
-      │            └──────────────┘                 │
-      │                     │                       │
-      └─────────────────────┴───────────────────────┘
-                         Circom Circuit
-             (transfer.circom - 3,297 constraints, 8 signals)
+      │              ┌──────┴──────┐                │
+      │              │             │                │
+      │         ┌────▼────┐  ┌─────▼─────┐         │
+      │         │ Transfer│  │   Claim   │         │
+      │         │ Prover  │  │  Prover   │         │
+      │         │ (Phase6)│  │ (Monero)  │         │
+      │         └────┬────┘  └─────┬─────┘         │
+      │              │             │                │
+      └──────────────┴─────────────┴────────────────┘
+                   Circom Circuits
+         (transfer-phase6.circom + claim.circom)
 ```
+
+## 🔑 Monero-Style Key System
+
+### Dual-Key Design
+```
+Master Seed (32 bytes)
+    │
+    ├─▶ View Private Key ────▶ View Public Key (scan blockchain)
+    │                               │
+    │                               └─▶ Stealth Address Generation
+    │
+    └─▶ Spend Private Key ───▶ Spend Public Key (claim payments)
+                                    │
+                                    └─▶ Zero-Knowledge Claim Proofs
+```
+
+### Privacy Flow
+1. **Sender** generates ephemeral key pair
+2. **Sender** computes recipient's stealth address: `stealthAddr = f(ephemeralPub, recipientViewPub)`
+3. **Sender** creates on-chain stealth payment with encrypted amount
+4. **Recipient** scans blockchain with view key to detect payments
+5. **Recipient** generates claim proof with spend key to unlock funds
+6. **Contract** verifies proof and credits recipient's ENA balance
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js v20.x
+- Node.js v20.x or higher
 - npm or yarn
 - Git
-- MetaMask (for frontend)
+- MetaMask wallet
+- Sepolia testnet ETH
 
 ### Installation
+
 ```bash
 # Clone repository
-git clone https://github.com/valtoosh/zkult.git
-cd zkult
+git clone https://github.com/valtoosh/zktoosh.git
+cd zktoosh
 
 # Install backend dependencies
 cd backend
@@ -61,305 +97,458 @@ cd ../frontend
 npm install
 ```
 
+### Generate Monero-Style Keys
+
+```bash
+# Generate your dual-key pair
+cd backend
+node -e "
+const crypto = require('crypto');
+const { buildPoseidon } = require('circomlibjs');
+
+async function generateKeys() {
+  const poseidon = await buildPoseidon();
+
+  // Master seed
+  const seed = crypto.randomBytes(32);
+
+  // Derive keys
+  const viewPriv = '0x' + crypto.createHash('sha256').update(Buffer.concat([seed, Buffer.from('view')])).digest('hex');
+  const spendPriv = '0x' + crypto.createHash('sha256').update(Buffer.concat([seed, Buffer.from('spend')])).digest('hex');
+
+  console.log('🔑 Your Monero-Style Keys:');
+  console.log('View Private Key:', viewPriv);
+  console.log('Spend Private Key:', spendPriv);
+  console.log('\\n⚠️  Save these securely! They control your funds.');
+}
+
+generateKeys();
+"
+```
+
 ### Running the Application
 
-**Backend:**
+**Backend (Proof Server):**
 ```bash
 cd backend
 npm start
 # Server runs on http://localhost:5001
 ```
 
-**Frontend:**
+**Frontend (React App):**
 ```bash
 cd frontend
 npm start
 # App runs on http://localhost:3000
 ```
 
-### Testing Phase 4 Nullifier System
-```bash
-# Test replay attack prevention
-node test-phase4-nullifier.js
+## 🧪 Complete Flow Example
+
+### 1. Deposit (10 ENA)
+```javascript
+// User deposits 10 ETH-equivalent into private balance
+await contract.privateTransfer(proof, publicSignals, {
+  value: ethers.parseEther("10")
+});
+// Result: EOA balance -10, ENA balance +10 (encrypted)
+```
+
+### 2. Transfer (6 ENA to Alice)
+```javascript
+// Generate stealth address for Alice
+const stealthAddr = computeStealthAddress(
+  aliceViewPubKey,
+  ephemeralPrivKey
+);
+
+// Create transfer with encrypted amount
+await contract.privateTransfer(proof, publicSignals);
+// Result: Stealth payment created, sender's ENA -6
+```
+
+### 3. Scan for Payments (Alice)
+```javascript
+// Alice scans blockchain with her view key
+const payments = await scanStealthPayments(aliceViewPrivKey);
+console.log('Found payment:', payments[0]);
+// Result: Detects incoming 6 ENA payment
+```
+
+### 4. Claim Payment (Alice)
+```javascript
+// Alice generates claim proof with spend key
+const claimProof = await generateClaimProof({
+  viewPrivateKey: aliceViewPrivKey,
+  spendPrivateKey: aliceSpendPrivKey,
+  transferAmount: 6,
+  stealthAddress: payments[0].stealthAddr
+});
+
+await contract.claimStealthPayment(claimProof, publicSignals);
+// Result: Alice's ENA balance +6
+```
+
+### 5. Withdraw (Alice)
+```javascript
+// Alice withdraws to her EOA
+await contract.privateTransfer(withdrawProof, publicSignals);
+// Result: Alice's ENA -6, EOA +6 ETH
 ```
 
 ## 🔧 Technology Stack
 
-- **Zero-Knowledge Proofs:** PLONK (via snarkjs)
-- **Circuit Language:** Circom 2.1.8
-- **Backend:** Node.js + Express + Helmet.js
-- **Frontend:** React 18 + ethers.js v6
-- **Smart Contracts:** Solidity 0.8.28 + Hardhat
-- **Blockchain:** Ethereum Sepolia Testnet
-- **Hash Function:** Poseidon (circomlibjs)
-- **Security:** Rate limiting (express-rate-limit)
+### Zero-Knowledge Proofs
+- **PLONK** - Universal trusted setup via snarkjs
+- **Circom 2.1.8** - Circuit language
+- **Transfer Circuit** - ~20k constraints (Phase 6)
+- **Claim Circuit** - ~15k constraints (Monero-style)
 
-## 🌐 Deployed Contracts (Sepolia)
+### Cryptography
+- **Poseidon Hash** - ZK-friendly hash function (circomlibjs)
+- **BN128 Curve** - Elliptic curve for proofs
+- **ECDH** - Shared secret computation for stealth addresses
+- **Symmetric Encryption** - Balance commitments
+
+### Backend
+- **Node.js + Express** - Proof generation server
+- **Helmet.js** - Security headers
+- **Rate Limiting** - DoS protection
+- **Merkle Tree Manager** - Anonymity set tracking
+
+### Frontend
+- **React 18** - Modern UI framework
+- **ethers.js v6** - Ethereum interaction
+- **MetaMask** - Wallet integration
+- **Web3 Context** - Global state management
+
+### Smart Contracts
+- **Solidity 0.8.28** - Latest stable version
+- **Hardhat** - Development environment
+- **PLONK Verifiers** - Auto-generated from circuits
+- **Merkle Tree** - On-chain anonymity set
+
+## 🌐 Deployed Contracts (Sepolia Testnet)
+
+### Current Deployment (Phase 6 - Complete)
 
 | Contract | Address | Status |
 |----------|---------|--------|
-| **PlonkVerifier** | [`0x3E6815...9ADF`](https://sepolia.etherscan.io/address/0x3E6815d062519E5f6cA3cf5b0aa5c9e860bc9ADF) | ✅ Verified (Phase 5B - Latest) |
-| **PrivateTransferV3** | [`0xE4D1Df...dB14`](https://sepolia.etherscan.io/address/0xE4D1Df4A4Fca4c26ecA611521D7CB1420fA6dB14) | ✅ Verified (Phase 5B - Wei Fix) |
+| **Transfer Verifier** | [`0x88E6A90c...B394B`](https://sepolia.etherscan.io/address/0x88E6A90c099809647c5164464f980E8109bB394B) | ✅ Verified |
+| **Claim Verifier** | [`0x63Ade6E4...b4C1C`](https://sepolia.etherscan.io/address/0x63Ade6E45c012E336DC1A5297EBaD8a8369b4C1C) | ✅ Verified |
+| **Poseidon** | [`0x3b3B814C...265B0`](https://sepolia.etherscan.io/address/0x3b3B814C9D26B3Aad586F6BA326808A0A4d265B0) | ✅ Verified |
+| **PrivateTransferV4** | [`0x51cC96fF...14903`](https://sepolia.etherscan.io/address/0x51cC96fFD6cA1B73e18030Aa78A62699F2b14903) | ✅ Verified |
 
-**Previous Deployments:**
-| Contract | Address | Status | Issue |
-|----------|---------|--------|-------|
-| PrivateTransferV3 (v2) | [`0x7f36ED...D41b1`](https://sepolia.etherscan.io/address/0x7f36ED306efc5a526dc6074491B3C015488D41b1) | ⚠️ Deprecated | Wei conversion bug |
-| PrivateTransferV3 (v1) | [`0xb224C9...ecd3`](https://sepolia.etherscan.io/address/0xb224C992C6B3E22982d2B9E8fd12d3e38639ecd3) | ⚠️ Deprecated | Claiming placeholder bug |
+**Deployment Date:** November 27, 2025
+**Network:** Sepolia Testnet
+**Complete Flow:** ✅ Tested (Deposit → Transfer → Claim → Withdraw)
 
-## 📊 Project Status
+### On-Chain Verification
 
-### **Phase 5B: ✅ COMPLETE - Function Privacy (Unified zkTransfer)** 🎉
-- ✅ Unified privateTransfer() function for all operations
-- ✅ Field arithmetic for withdrawal detection
-- ✅ Pending transfer creation for claiming
-- ✅ Complete end-to-end flow tested: Deposit → Transfer → Claim → Withdraw
-- ✅ Contract deployed and verified on Sepolia
-- ✅ Frontend fully integrated
-- ✅ Documentation complete ([PHASE5_COMPLETE.md](PHASE5_COMPLETE.md))
+**Privacy Enhancement Confirmed:**
+- Total deposits: 1 (10 ENA)
+- Total stealth payments: **1** (only the 6 ENA transfer)
+- Deposits do NOT create stealth payments ✅
+- Privacy leak eliminated ✅
 
-### **Phase 5A: ✅ COMPLETE - Dual Account Model**
-- ✅ EOA (public) and ENA (encrypted private) balance tracking
-- ✅ Poseidon symmetric encryption for ENA balances
-- ✅ Circuit enhanced to 11 public signals
-- ✅ Frontend dual balance display with localStorage persistence
-- ✅ kENA generation and management
+## 📊 Circuit Specifications
 
-### **Phase 4: ✅ COMPLETE - Critical Security Hardening**
-- ✅ Nullifier system for replay attack prevention
-- ✅ Secure random salt generation (32 bytes)
-- ✅ API rate limiting (10 proofs/min, 100 API calls/15min)
-- ✅ HTTP security headers (Helmet.js)
+### Transfer Circuit (Phase 6)
+**File:** `circuits/plonk/transfer-phase6.circom`
+**Constraints:** ~20,000
+**Proof Time:** ~700-800ms
 
-### **Phase 3: ✅ COMPLETE - Hash-Based Claiming**
-- ✅ Recipient privacy via Poseidon hash
-- ✅ Two-phase transfer (create → claim)
-- ✅ Deposit/withdrawal management
-- ✅ Frontend UI with claiming interface
-
-### **Phase 2: ✅ COMPLETE - Frontend & Deployment**
-- ✅ React frontend with MetaMask integration
-- ✅ Contract deployment to Sepolia
-- ✅ End-to-end testing
-- ✅ Professional UI (Binance-inspired)
-
-### **Phase 1: ✅ COMPLETE - Core System**
-- ✅ Enhanced PLONK circuit with commitments
-- ✅ Backend proof generation
-- ✅ API endpoints
-- ✅ Test suite
-
-### **Phase 6: 📅 NEXT - Advanced Features**
-- [ ] Auditability (two-recipient encryption)
-- [ ] Range proofs for amount validation
-- [ ] Merkle trees for privacy pools
-- [ ] Multi-asset support (ERC20)
-
-## 📁 Project Structure
-```
-zkult/
-├── circuits/
-│   └── plonk/
-│       ├── transfer.circom          # Enhanced PLONK circuit (8 signals)
-│       └── output/                  # Compiled circuit artifacts
-├── backend/
-│   ├── src/
-│   │   ├── services/
-│   │   │   └── plonkProver.js      # Proof generation + secure salt
-│   │   ├── routes/
-│   │   │   └── proof.routes.js     # API endpoints
-│   │   ├── middleware/
-│   │   │   └── rateLimiter.js      # Rate limiting (Phase 4)
-│   │   └── server.js               # Express server + Helmet
-│   └── keys/plonk/                 # PLONK keys (gitignored)
-├── contracts/
-│   └── plonk/
-│       ├── PlonkVerifier.sol       # Auto-generated verifier (8 signals)
-│       └── PrivateTransferV3.sol   # Transfer contract + nullifiers
-├── frontend/
-│   └── src/
-│       ├── components/
-│       │   ├── TransactionForm.js  # Send transfer UI
-│       │   ├── ClaimTransfer.js    # Claim transfer UI
-│       │   ├── DepositPanel.js     # Deposit management
-│       │   └── WithdrawalPanel.js  # Withdrawal management
-│       ├── contexts/
-│       │   └── Web3Context.jsx     # Web3/MetaMask integration
-│       └── App.js
-├── deployments/                    # Deployment records
-├── test-phase4-nullifier.js        # Nullifier replay test
-├── PHASE4_COMPLETE.md              # Phase 4 documentation
-└── README.md
-```
-
-## 🧪 Circuit Specifications
-
-### Public Signals (8 total - Phase 4)
+**Public Signals (11 total):**
 | Index | Name | Type | Description |
 |-------|------|------|-------------|
-| [0] | `valid` | Output | Transfer validation result |
-| [1] | `newBalance` | Output | Sender's balance after transfer |
-| [2] | `newBalanceCommitment` | Output | Poseidon commitment to new balance |
-| [3] | `recipientHash` | Output | Hash for recipient claiming |
-| [4] | **`nullifier`** | Output | **Unique ID to prevent double-spending (Phase 4)** |
-| [5] | `assetId` | Public Input | Asset identifier |
-| [6] | `maxAmount` | Public Input | Maximum allowed amount |
-| [7] | `balanceCommitment` | Public Input | Commitment to original balance |
+| [0] | `valid` | Output | Proof validity flag |
+| [1] | `newBalance` | Output | Updated sender balance |
+| [2] | `newBalanceCommitment` | Output | Poseidon(newBalance, kENA) |
+| [3] | `recipientHash` | Output | Poseidon(recipientViewPub, amount) |
+| [4] | `nullifier` | Output | Replay protection |
+| [5] | `ephemeralPublicKey` | Output | For stealth address derivation |
+| [6] | `assetId` | Public Input | Asset identifier |
+| [7] | `maxAmount` | Public Input | Range proof upper bound |
+| [8] | `balanceCommitment` | Public Input | Original balance commitment |
+| [9] | `merkleRoot` | Public Input | Anonymity set root |
+| [10] | `encryptedMemo` | Public Input | Private message hash |
 
-**Nullifier Formula:** `nullifier = Poseidon(balanceCommitment, salt, transferAmount)`
+### Claim Circuit (Monero-Style)
+**File:** `circuits/plonk/claim.circom`
+**Constraints:** ~15,000
+**Proof Time:** ~35-40s
+
+**Public Signals (5 total):**
+| Index | Name | Type | Description |
+|-------|------|------|-------------|
+| [0] | `valid` | Output | Claim validity |
+| [1] | `claimerAddressHash` | Output | Poseidon(viewPub, amount) |
+| [2] | `claimedAmount` | Output | Amount being claimed |
+| [3] | `assetId` | Output | Asset identifier |
+| [4] | `stealthAddress` | Output | Stealth address identifier |
+
+**Key Insight:** The claim circuit proves knowledge of both view key and spend key without revealing them, ensuring only the intended recipient can claim.
 
 ## 🔐 Security Features
 
-### Phase 4 Enhancements
-- **🛡️ Nullifier System:** Prevents replay attacks and double-spending
-  - Each proof generates unique nullifier
-  - Contract tracks used nullifiers
-  - Replay attacks automatically rejected
+### Monero-Style Privacy
+- **Unlinkability** - Each stealth address is unique, breaking on-chain links
+- **View Key Separation** - Can scan without claiming capability
+- **Spend Key Protection** - Required for claiming, never revealed on-chain
+- **Amount Hiding** - Transfer amounts encrypted, revealed only to recipient
 
-- **🎲 Secure Randomness:** Cryptographically secure salt generation
-  - `crypto.randomBytes(32)` for 256-bit entropy
-  - Field-constrained to BN128 curve
-  - Unique proof per transaction
+### Zero-Knowledge Proofs
+- **Balance Privacy** - Balances committed using Poseidon
+- **Amount Privacy** - Transfer amounts hidden in proofs
+- **Range Proofs** - Prevents negative balances without revealing amount
+- **Merkle Anonymity** - Transfers hidden in anonymity set
 
-- **⏱️ Rate Limiting:** Three-tier DoS protection
-  - Proof generation: 10 requests/min per IP
-  - General API: 100 requests/15min per IP
-  - Strict limiter: 5 requests/min for sensitive ops
+### Contract Security
+- **Nullifier Tracking** - Prevents double-spending and replay attacks
+- **Access Control** - Owner-only admin functions
+- **Input Validation** - Strict parameter checking
+- **Reentrancy Protection** - Secure external calls
 
-- **🔒 HTTP Security:** Helmet.js security headers
-  - CSP, COEP, and other security policies
-  - Protection against common web vulnerabilities
+### Infrastructure Security
+- **Rate Limiting** - 10 proofs/min, 100 API calls/15min
+- **HTTP Security** - Helmet.js with CSP, COEP headers
+- **CORS** - Restricted origins
+- **Secure Randomness** - crypto.randomBytes(32) for salt
 
-### Core Privacy Features
-- **Private Balances:** Balance commitments using Poseidon hash
-- **Private Recipients:** Ethereum addresses hashed to 160-bit values
-- **Private Amounts:** Transfer amounts hidden in zero-knowledge proof
-- **Public Verification:** Anyone can verify proof validity without seeing private data
-- **Hash-Based Claiming:** Recipients claim without revealing address on-chain
-
-## 📈 Performance
+## 📈 Performance Benchmarks
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| Proof Generation | ~1-1.5s | ✅ Good |
-| Circuit Constraints | 3,297 | ✅ Reasonable |
-| Public Signals | 8 | ✅ Optimized |
-| Gas (Proof Verification) | ~400k-450k | ✅ Acceptable |
-| Proving Key Size | ~6MB | ✅ Acceptable |
-| Address Validation | Regex (fast) | ✅ Efficient |
+| Transfer Proof Generation | ~700-800ms | ✅ Fast |
+| Claim Proof Generation | ~35-40s | ⚠️ Acceptable |
+| Transfer Circuit Constraints | ~20,000 | ✅ Efficient |
+| Claim Circuit Constraints | ~15,000 | ✅ Efficient |
+| Gas (Transfer Verification) | ~450-500k | ✅ Reasonable |
+| Gas (Claim Verification) | ~400-450k | ✅ Reasonable |
+| Merkle Tree Depth | 20 levels | ✅ Large (~1M) |
+| Anonymity Set Capacity | ~1M transfers | ✅ Scalable |
 
-## 🔗 Comparison to Azeroth Paper
+## 📁 Project Structure
 
-**Feature Parity: ~85%** | **Security Maturity: ~70%**
+```
+zktoosh/
+├── circuits/
+│   └── plonk/
+│       ├── transfer-phase6.circom    # Main transfer circuit
+│       ├── claim.circom              # Monero-style claim circuit
+│       ├── stealth.circom            # Stealth address components
+│       ├── merkle.circom             # Merkle tree proofs
+│       ├── range_proof.circom        # Amount validation
+│       └── claim_build/              # Compiled claim circuit
+├── backend/
+│   ├── src/
+│   │   ├── services/
+│   │   │   ├── plonkProverPhase6.js  # Transfer proof generation
+│   │   │   ├── claimProver.js        # Claim proof generation
+│   │   │   ├── merkleSync.js         # Merkle tree sync
+│   │   │   └── blockchainScanner.js  # Payment scanning
+│   │   ├── routes/
+│   │   │   ├── proof-phase6.routes.js # Transfer API
+│   │   │   ├── claim.routes.js        # Claim API
+│   │   │   └── merkle.routes.js       # Merkle tree API
+│   │   ├── middleware/
+│   │   │   └── rateLimiter.js        # DoS protection
+│   │   └── server.js                 # Express server
+│   └── package.json
+├── contracts/
+│   └── plonk/
+│       ├── PrivateTransferV4.sol     # Main contract
+│       ├── PlonkVerifierPhase6.sol   # Transfer verifier
+│       ├── ClaimVerifier.sol         # Claim verifier
+│       └── Poseidon.sol              # Hash library
+├── frontend/
+│   └── src/
+│       ├── components/
+│       │   ├── Phase6Transfer.js     # Transfer UI
+│       │   ├── ClaimStealthPayment.js # Claim UI
+│       │   ├── DepositPanel.js       # Deposit UI
+│       │   └── WithdrawalPanel.js    # Withdraw UI
+│       ├── contexts/
+│       │   └── Web3Context.jsx       # Web3 state
+│       ├── utils/
+│       │   └── keyManagement.js      # Dual-key generation
+│       └── App.js
+├── scripts/
+│   ├── deploy-phase6.js              # Deployment script
+│   └── verify-contracts.js           # Verification script
+├── deployments/                      # Deployment records
+├── SESSION_NOTES.md                  # Development log
+├── hardhat.config.js
+└── README.md
+```
 
-| Feature | Azeroth | zkUlt (Phase 4) | Status |
-|---------|---------|-----------------|--------|
-| Zero-knowledge proofs | ✅ Groth16 | ✅ PLONK | ✅ **BETTER** (universal setup) |
-| Balance privacy | ✅ Pedersen | ✅ Poseidon | ✅ **BETTER** (ZK-friendly) |
-| Replay protection | ✅ Nullifiers | ✅ Nullifiers | ✅ **EQUAL** |
-| Secure randomness | ✅ Secure | ✅ crypto.randomBytes(32) | ✅ **EQUAL** |
-| DoS protection | ✅ Rate limiting | ✅ Express rate-limit | ✅ **EQUAL** |
-| Auditability | ✅ Two-recipient | ❌ Not implemented | 🔴 **Phase 5** |
-| Formal proofs | ✅ L-IND, TR-NM, BAL, AUD | ❌ Not implemented | 🔴 **Phase 5** |
+## 🎯 Phase 6 Accomplishments
 
-## 🛣️ Roadmap
+### Core Privacy System ✅
+- [x] Monero-style dual-key cryptography
+- [x] Stealth address generation
+- [x] Ephemeral key exchange (ECDH)
+- [x] Payment scanning with view key
+- [x] Claim proof with spend key
+- [x] Privacy-enhanced deposits
 
-**Completed (Phases 1-4):**
-- ✅ Core PLONK system
-- ✅ Frontend integration
-- ✅ Hash-based claiming
-- ✅ Nullifier system
-- ✅ Secure randomness
-- ✅ Rate limiting
-- ✅ Sepolia deployment
+### Advanced Features ✅
+- [x] Merkle tree anonymity (20 levels)
+- [x] Range proof integration
+- [x] Encrypted memo support
+- [x] Balance commitment system
+- [x] Nullifier-based replay protection
+- [x] Admin verifier update functions
 
-**Phase 5 (Documentation & Research):**
-- [ ] Technical documentation
-- [ ] Research paper/report
-- [ ] Performance benchmarks vs. existing systems
-- [ ] Security analysis (informal security arguments)
-- [ ] Demo video
-- [ ] arXiv/blog post
+### Testing & Deployment ✅
+- [x] Complete end-to-end flow tested
+- [x] Sepolia testnet deployment
+- [x] Contract verification on Etherscan
+- [x] On-chain privacy verification
+- [x] Backend Merkle tree synchronization
+- [x] Frontend dual-key management
 
-**Phase 6 (Testing & Hardening):**
-- [ ] Comprehensive test suite
-- [ ] Input validation hardening
-- [ ] Gas optimization
-- [ ] Load testing
+### Documentation ✅
+- [x] Comprehensive README
+- [x] Session notes with technical details
+- [x] Circuit specifications
+- [x] API documentation
+- [x] Deployment records
 
-**Long-term:**
-- [ ] Auditability (two-recipient encryption)
+## 🧪 Testing
+
+### Manual Testing
+```bash
+# Test complete flow
+node test-phase6-flow.js
+
+# Test claim circuit
+node test-claim-circuit-final.js
+
+# Scan blockchain for payments
+node debug-scan-payments-v2.js
+
+# Check on-chain state
+node check-stealth-payment.js
+```
+
+### Frontend Testing
+1. Open http://localhost:3000
+2. Connect MetaMask (Sepolia testnet)
+3. Generate Monero-style keys
+4. Test flow:
+   - Deposit 10 ENA
+   - Transfer 6 ENA to another user
+   - Scan for incoming payments
+   - Claim payment
+   - Withdraw to EOA
+
+## 🔮 Future Enhancements
+
+### Phase 7 (Planned)
+- [ ] Multi-asset support (ERC20 tokens)
+- [ ] Batch transfers (multiple recipients)
+- [ ] Subaddresses (single seed, multiple addresses)
+- [ ] Transaction history encryption
+- [ ] Payment proof generation
+
+### Phase 8 (Research)
+- [ ] Ring signatures for sender anonymity
+- [ ] Confidential transactions (Bulletproofs)
+- [ ] Layer 2 integration (zkRollup)
+- [ ] Cross-chain bridges
 - [ ] Formal security proofs
-- [ ] Multi-asset support (ERC20)
-- [ ] Privacy pools (Merkle trees)
+
+### Long-term
 - [ ] Mainnet deployment
+- [ ] Mobile app (React Native)
+- [ ] Hardware wallet support
+- [ ] Decentralized key recovery
+- [ ] Audit by security firm
 
-## 🧪 Example Usage
+## 📖 Key Concepts
 
-### Send Transfer
-```javascript
-// Test input
-const input = {
-  senderBalance: 6000,
-  transferAmount: 200,
-  recipientAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-  assetId: 1998,
-  maxAmount: 12000
-};
+### Stealth Addresses
+A stealth address is a one-time payment address derived from the recipient's public view key and an ephemeral key pair. Only the recipient can detect and claim payments to their stealth addresses.
 
-// Expected output
-{
-  valid: true,
-  newBalance: 5800,  // 6000 - 200
-  nullifier: '686030640708880201...',  // Phase 4
-  recipientHash: '720737295108221033...',
-  proof: { ... },
-  generationTime: 1332  // ms
-}
-```
+**Formula:** `stealthAddr = Poseidon(sharedSecret, recipientViewPub)`
 
-### Claim Transfer
-```javascript
-// Recipient claims using recipientHash
-const recipientHash = '720737295108221033...';
-await contract.claimTransfer(recipientHash);
-// Funds credited to recipient's balance
-```
+### Dual-Key System
+- **View Key**: Used to scan blockchain and detect incoming payments (read-only)
+- **Spend Key**: Required to generate claim proofs and access funds (full control)
+
+This separation allows:
+- View-only wallets for auditing
+- Hot wallet (view key) + cold wallet (spend key) setup
+- Delegated scanning without spending capability
+
+### Zero-Knowledge Claims
+When claiming a stealth payment, the recipient proves:
+1. Knowledge of the view private key
+2. Knowledge of the spend private key
+3. Correct derivation of the claimer address hash
+4. Match with the on-chain encrypted amount
+
+All without revealing any private keys on-chain.
 
 ## 🤝 Contributing
 
-Contributions welcome! Please follow these guidelines:
+Contributions are welcome! Please follow these guidelines:
+
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'feat: Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+### Development Guidelines
+- Follow existing code style
+- Add tests for new features
+- Update documentation
+- Keep commits atomic and well-described
+
 ## 📄 License
 
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE](LICENSE) file for details
 
 ## 👤 Author
 
 **valtoosh**
 - GitHub: [@valtoosh](https://github.com/valtoosh)
+- Repository: [zktoosh](https://github.com/valtoosh/zktoosh)
 
 ## 🙏 Acknowledgments
 
-- [Circom](https://docs.circom.io/) - Circuit language
-- [snarkjs](https://github.com/iden3/snarkjs) - PLONK prover
-- [circomlibjs](https://github.com/iden3/circomlibjs) - Poseidon hash
-- [Hardhat](https://hardhat.org/) - Smart contract development
-- [Azeroth Paper](https://eprint.iacr.org/2023/xxx) - Research inspiration
+- **Monero Project** - Stealth address and dual-key inspiration
+- **Circom** - Circuit language ([docs.circom.io](https://docs.circom.io/))
+- **snarkjs** - PLONK prover ([github.com/iden3/snarkjs](https://github.com/iden3/snarkjs))
+- **circomlibjs** - Poseidon hash ([github.com/iden3/circomlibjs](https://github.com/iden3/circomlibjs))
+- **Hardhat** - Smart contract development ([hardhat.org](https://hardhat.org/))
+- **Tornado Cash** - Privacy pool design patterns
+- **Aztec Protocol** - PLONK implementation insights
 
 ## 📞 Support
 
 For issues or questions:
-- Open an issue on GitHub
-- Check [PHASE4_COMPLETE.md](./PHASE4_COMPLETE.md) for detailed Phase 4 documentation
+- Open an issue on [GitHub](https://github.com/valtoosh/zktoosh/issues)
+- Check [SESSION_NOTES.md](SESSION_NOTES.md) for development history
+- Review circuit files in `circuits/plonk/` for technical details
+
+## 🎓 Learn More
+
+### Recommended Reading
+- [Monero Stealth Addresses](https://www.getmonero.org/resources/moneropedia/stealthaddress.html)
+- [PLONK Paper](https://eprint.iacr.org/2019/953.pdf)
+- [Circom Documentation](https://docs.circom.io/)
+- [Zero-Knowledge Proofs: An Illustrated Primer](https://blog.cryptographyengineering.com/2014/11/27/zero-knowledge-proofs-illustrated-primer/)
+
+### Video Tutorials
+- [Zero-Knowledge Proofs Explained](https://www.youtube.com/watch?v=fOGdb1CTu5c)
+- [Circom and snarkjs Tutorial](https://www.youtube.com/watch?v=CTJ1JkYLiyw)
 
 ---
 
-**Status:** Phase 5B Complete (Dual Account Model + Function Privacy) | Deployed on Sepolia Testnet
+**Status:** Phase 6 Complete ✅ | Deployed on Sepolia Testnet
+**Latest:** Complete Monero-style privacy flow working end-to-end 🎉
+**Repository:** https://github.com/valtoosh/zktoosh
 
-**Latest:** Complete end-to-end flow tested successfully: Deposit → Transfer → Claim → Withdraw 🎉
+**Privacy Verified On-Chain:** Only 1 stealth payment for 1 transfer (deposits excluded) ✅
