@@ -1,0 +1,39 @@
+{
+  "version": "Phase 6 Unified (6B-E)",
+  "network": "sepolia",
+  "chainId": "11155111",
+  "deployer": "0xA1090527ac5c019Abc3989F405a5a63bB008008D",
+  "timestamp": "2025-11-27T07:01:25.784Z",
+  "features": [
+    "Phase 6B: Stealth Addresses",
+    "Phase 6C: Merkle Tree Anonymity",
+    "Phase 6D: Range Proofs",
+    "Phase 6E: Encrypted Memos"
+  ],
+  "contracts": {
+    "PlonkVerifierPhase6": {
+      "address": "0x88E6A90c099809647c5164464f980E8109bB394B",
+      "blockNumber": null
+    },
+    "ClaimVerifier": {
+      "address": "0x63Ade6E45c012E336DC1A5297EBaD8a8369b4C1C",
+      "blockNumber": null
+    },
+    "Poseidon": {
+      "address": "0x3b3B814C9D26B3Aad586F6BA326808A0A4d265B0",
+      "blockNumber": null
+    },
+    "PrivateTransferV4": {
+      "address": "0x51cC96fFD6cA1B73e18030Aa78A62699F2b14903",
+      "blockNumber": null
+    }
+  },
+  "circuit": {
+    "constraints": 20021,
+    "publicSignals": 17,
+    "privateInputs": 51
+  },
+  "verification": {
+    "etherscan": "https://sepolia.etherscan.io/address/0x51cC96fFD6cA1B73e18030Aa78A62699F2b14903"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "extends": ["react-app"],
+  "globals": {
+    "BigInt": "readonly"
+  },
+  "rules": {
+    "no-undef": "warn",
+    "no-unused-vars": "warn",
+    "react-hooks/exhaustive-deps": "warn",
+    "import/no-anonymous-default-export": "warn"
+  }
+}

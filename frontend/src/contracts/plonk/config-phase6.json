@@ -1,0 +1,15 @@
+{
+  "version": "Phase 6 Unified",
+  "transferVerifierAddress": "0x88E6A90c099809647c5164464f980E8109bB394B",
+  "claimVerifierAddress": "0x63Ade6E45c012E336DC1A5297EBaD8a8369b4C1C",
+  "poseidonHasherAddress": "0x3b3B814C9D26B3Aad586F6BA326808A0A4d265B0",
+  "transferAddress": "0x51cC96fFD6cA1B73e18030Aa78A62699F2b14903",
+  "network": "sepolia",
+  "chainId": "11155111",
+  "features": [
+    "Phase 6B: Stealth Addresses",
+    "Phase 6C: Merkle Tree Anonymity",
+    "Phase 6D: Range Proofs",
+    "Phase 6E: Encrypted Memos"
+  ]
+}

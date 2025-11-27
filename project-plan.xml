@@ -1,0 +1,653 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <metadata>
+    <name>zkUlt - Zero-Knowledge Private Transfer System</name>
+    <version>1.0.0</version>
+    <description>Privacy-preserving blockchain transfer system using PLONK proofs with Ethereum address support</description>
+    <created>2024-11-06</created>
+    <status>Phase 1 Complete - Backend Working</status>
+  </metadata>
+
+  <technology_stack>
+    <blockchain>
+      <network>Ethereum Sepolia Testnet</network>
+      <framework>Hardhat</framework>
+      <proof_system>PLONK</proof_system>
+    </blockchain>
+    <circuit>
+      <language>Circom 2.1.8</language>
+      <library>circomlib</library>
+      <constraints>847 (Enhanced Circuit)</constraints>
+    </circuit>
+    <backend>
+      <runtime>Node.js 20.x</runtime>
+      <framework>Express.js</framework>
+      <proof_library>snarkjs</proof_library>
+      <hash_library>circomlibjs (Poseidon)</hash_library>
+    </backend>
+    <frontend>
+      <framework>React 18</framework>
+      <styling>CSS3</styling>
+      <web3>ethers.js v6</web3>
+    </frontend>
+  </technology_stack>
+
+  <current_implementation>
+    <completed_features>
+      <feature id="1" status="✅ DONE">
+        <name>Enhanced PLONK Circuit</name>
+        <description>Circuit with Poseidon commitments and Ethereum address support (160-bit)</description>
+        <location>circuits/plonk/transfer.circom</location>
+        <constraints>847</constraints>
+        <inputs>
+          <private>senderBalance, transferAmount, recipientAddressHash, salt</private>
+          <public>maxAmount, assetId, balanceCommitment</public>
+        </inputs>
+        <outputs>
+          <output>valid, newBalance, newBalanceCommitment</output>
+        </outputs>
+      </feature>
+
+      <feature id="2" status="✅ DONE">
+        <name>PLONK Key Generation</name>
+        <description>Generated proving and verification keys for enhanced circuit</description>
+        <files>
+          <file>backend/keys/plonk/transfer_final.zkey (~3MB)</file>
+          <file>backend/keys/plonk/verification_key.json</file>
+          <file>contracts/plonk/PlonkVerifier.sol</file>
+        </files>
+      </feature>
+
+      <feature id="3" status="✅ DONE">
+        <name>Backend Proof Generation with Ethereum Addresses</name>
+        <description>Express server generating PLONK proofs with Ethereum address support</description>
+        <location>backend/src/services/plonkProver.js</location>
+        <capabilities>
+          <capability>Validates Ethereum addresses (0x + 40 hex chars)</capability>
+          <capability>Converts addresses to 160-bit BigInt hashes</capability>
+          <capability>Calculates Poseidon commitments (matches circuit)</capability>
+          <capability>Generates PLONK proofs (~700ms)</capability>
+          <capability>Verifies proofs off-chain</capability>
+        </capabilities>
+        <dependencies>
+          <dependency>ethers.js v6.15.0</dependency>
+          <dependency>snarkjs</dependency>
+          <dependency>circomlibjs (Poseidon hash)</dependency>
+        </dependencies>
+      </feature>
+
+      <feature id="4" status="✅ DONE">
+        <name>Backend API Routes</name>
+        <description>RESTful API for proof generation</description>
+        <location>backend/src/routes/proof.routes.js</location>
+        <endpoints>
+          <endpoint method="POST" path="/api/proof/generate">
+            <description>Generate PLONK proof</description>
+            <input>
+              <field name="senderBalance" type="number" required="true"/>
+              <field name="transferAmount" type="number" required="true"/>
+              <field name="recipientAddress" type="string" required="true" format="0x + 40 hex"/>
+              <field name="assetId" type="number" required="true"/>
+              <field name="maxAmount" type="number" required="true"/>
+              <field name="salt" type="string" required="false" default="12345"/>
+            </input>
+          </endpoint>
+          <endpoint method="GET" path="/api/proof/stats">
+            <description>Get proof generation statistics</description>
+          </endpoint>
+          <endpoint method="GET" path="/health">
+            <description>Health check</description>
+          </endpoint>
+        </endpoints>
+      </feature>
+    </completed_features>
+
+    <in_progress_features>
+      <feature id="5" status="🔄 IN PROGRESS">
+        <name>Frontend Ethereum Address Input</name>
+        <description>Update UI to accept and validate Ethereum addresses</description>
+        <location>frontend/src/components/TransactionForm.js</location>
+        <tasks>
+          <task status="pending">Replace recipientId number input with address input</task>
+          <task status="pending">Add address format validation (0x + 40 hex chars)</task>
+          <task status="pending">Add visual feedback for valid/invalid addresses</task>
+          <task status="pending">Update API call to send recipientAddress instead of recipientId</task>
+        </tasks>
+      </feature>
+
+      <feature id="6" status="🔄 IN PROGRESS">
+        <name>Smart Contract Deployment</name>
+        <description>Deploy updated contracts with new PlonkVerifier</description>
+        <location>contracts/plonk/</location>
+        <tasks>
+          <task status="pending">Deploy new PlonkVerifier.sol to Sepolia</task>
+          <task status="pending">Deploy PrivateTransferV3.sol</task>
+          <task status="pending">Update frontend with new contract addresses</task>
+          <task status="pending">Test on-chain proof verification</task>
+        </tasks>
+      </feature>
+    </in_progress_features>
+  </current_implementation>
+
+  <phase_roadmap>
+    <phase number="1" name="Foundation" status="✅ COMPLETE">
+      <description>Core system with Ethereum address support</description>
+      <deliverables>
+        <deliverable>✅ Enhanced circuit with commitments</deliverable>
+        <deliverable>✅ PLONK key generation</deliverable>
+        <deliverable>✅ Backend proof generation with addresses</deliverable>
+        <deliverable>✅ API endpoints</deliverable>
+      </deliverables>
+    </phase>
+
+    <phase number="2" name="Integration" status="🔄 IN PROGRESS">
+      <description>Frontend and contract integration</description>
+      <tasks>
+        <task priority="HIGH">Update frontend for Ethereum addresses</task>
+        <task priority="HIGH">Deploy contracts to Sepolia</task>
+        <task priority="MEDIUM">End-to-end testing</task>
+        <task priority="MEDIUM">Error handling improvements</task>
+      </tasks>
+      <estimated_time>1-2 days</estimated_time>
+    </phase>
+
+    <phase number="3" name="Security & Privacy" status="📅 PLANNED">
+      <description>Enhanced privacy features and security auditing</description>
+      <tasks>
+        <task priority="HIGH">Implement proper salt randomization</task>
+        <task priority="HIGH">Add balance encryption</task>
+        <task priority="HIGH">Implement nullifier system (prevent double-spending)</task>
+        <task priority="MEDIUM">Add Merkle tree for balance commitments</task>
+        <task priority="MEDIUM">Circuit optimization (reduce constraint count)</task>
+        <task priority="LOW">Formal verification of circuit</task>
+      </tasks>
+      <estimated_time>1-2 weeks</estimated_time>
+    </phase>
+
+    <phase number="4" name="Advanced Features" status="📅 PLANNED">
+      <description>Multi-asset support and advanced transfer types</description>
+      <tasks>
+        <task priority="HIGH">Multi-asset transfer support (ERC20, ERC721)</task>
+        <task priority="HIGH">Batch transfers (multiple recipients)</task>
+        <task priority="MEDIUM">Scheduled/time-locked transfers</task>
+        <task priority="MEDIUM">Transfer limits and whitelisting</task>
+        <task priority="MEDIUM">Transaction history with privacy</task>
+        <task priority="LOW">Stealth addresses</task>
+      </tasks>
+      <estimated_time>2-3 weeks</estimated_time>
+    </phase>
+
+    <phase number="5" name="Production" status="📅 PLANNED">
+      <description>Mainnet deployment and production hardening</description>
+      <tasks>
+        <task priority="CRITICAL">Security audit (circuit + contracts)</task>
+        <task priority="CRITICAL">Gas optimization</task>
+        <task priority="HIGH">Mainnet deployment</task>
+        <task priority="HIGH">Monitoring and alerting</task>
+        <task priority="MEDIUM">Documentation and API reference</task>
+        <task priority="MEDIUM">User guides and tutorials</task>
+        <task priority="LOW">Bug bounty program</task>
+      </tasks>
+      <estimated_time>3-4 weeks</estimated_time>
+    </phase>
+  </phase_roadmap>
+
+  <architecture>
+    <components>
+      <component name="Circuit Layer">
+        <file>circuits/plonk/transfer.circom</file>
+        <responsibilities>
+          <responsibility>Validate transfer constraints</responsibility>
+          <responsibility>Verify Poseidon commitments</responsibility>
+          <responsibility>Ensure recipient address validity (160-bit)</responsibility>
+          <responsibility>Calculate new balance</responsibility>
+        </responsibilities>
+      </component>
+
+      <component name="Backend Layer">
+        <files>
+          <file>backend/src/server.js</file>
+          <file>backend/src/services/plonkProver.js</file>
+          <file>backend/src/routes/proof.routes.js</file>
+        </files>
+        <responsibilities>
+          <responsibility>Accept proof generation requests</responsibility>
+          <responsibility>Validate Ethereum addresses</responsibility>
+          <responsibility>Calculate Poseidon commitments</responsibility>
+          <responsibility>Generate PLONK proofs</responsibility>
+          <responsibility>Verify proofs off-chain</responsibility>
+          <responsibility>Return formatted proofs to frontend</responsibility>
+        </responsibilities>
+      </component>
+
+      <component name="Smart Contract Layer">
+        <files>
+          <file>contracts/plonk/PlonkVerifier.sol</file>
+          <file>contracts/plonk/PrivateTransferV3.sol</file>
+        </files>
+        <responsibilities>
+          <responsibility>Verify PLONK proofs on-chain</responsibility>
+          <responsibility>Enforce transfer rules</responsibility>
+          <responsibility>Emit transfer events</responsibility>
+          <responsibility>Manage asset balances (future)</responsibility>
+        </responsibilities>
+      </component>
+
+      <component name="Frontend Layer">
+        <files>
+          <file>frontend/src/components/TransactionForm.js</file>
+          <file>frontend/src/App.js</file>
+        </files>
+        <responsibilities>
+          <responsibility>Accept user input (balances, amounts, addresses)</responsibility>
+          <responsibility>Validate Ethereum addresses</responsibility>
+          <responsibility>Request proof generation from backend</responsibility>
+          <responsibility>Submit proofs to blockchain</responsibility>
+          <responsibility>Display transaction results</responsibility>
+        </responsibilities>
+      </component>
+    </components>
+
+    <data_flow>
+      <step number="1">User enters transfer details in frontend (including Ethereum address)</step>
+      <step number="2">Frontend validates address format</step>
+      <step number="3">Frontend sends POST request to backend /api/proof/generate</step>
+      <step number="4">Backend validates input and converts address to BigInt</step>
+      <step number="5">Backend calculates Poseidon commitment for balance</step>
+      <step number="6">Backend generates PLONK proof (~700ms)</step>
+      <step number="7">Backend verifies proof off-chain</step>
+      <step number="8">Backend returns proof + public signals to frontend</step>
+      <step number="9">Frontend submits proof to smart contract</step>
+      <step number="10">Smart contract verifies proof on-chain</step>
+      <step number="11">Smart contract emits TransferProofVerified event</step>
+      <step number="12">Frontend displays success with recipient address</step>
+    </data_flow>
+  </architecture>
+
+  <testing_strategy>
+    <unit_tests>
+      <test name="Address Validation" status="✅ PASSING">
+        <description>Test Ethereum address format validation (0x + 40 hex chars)</description>
+        <location>backend/test-prover-new.js</location>
+      </test>
+      <test name="Address to BigInt Conversion" status="✅ PASSING">
+        <description>Test conversion of Ethereum address to 160-bit BigInt</description>
+        <location>backend/test-prover-new.js</location>
+      </test>
+      <test name="Poseidon Commitment" status="✅ PASSING">
+        <description>Test Poseidon hash calculation matches circuit</description>
+        <location>backend/test-prover-new.js</location>
+      </test>
+      <test name="Proof Generation" status="✅ PASSING">
+        <description>Test full proof generation with valid inputs</description>
+        <location>backend/test-prover-new.js</location>
+        <result>
+          <time>~728ms</time>
+          <valid>true</valid>
+          <newBalance>5905 (6000 - 95)</newBalance>
+        </result>
+      </test>
+    </unit_tests>
+
+    <integration_tests status="📅 TODO">
+      <test name="Frontend to Backend">
+        <description>Test complete flow from UI to proof generation</description>
+      </test>
+      <test name="Backend to Contract">
+        <description>Test proof submission and on-chain verification</description>
+      </test>
+      <test name="End-to-End">
+        <description>Test full transfer flow with real Ethereum address</description>
+      </test>
+    </integration_tests>
+
+    <security_tests status="📅 TODO">
+      <test name="Invalid Address Handling">
+        <description>Test system rejects invalid Ethereum addresses</description>
+      </test>
+      <test name="Proof Tampering">
+        <description>Verify tampered proofs are rejected</description>
+      </test>
+      <test name="Replay Attack">
+        <description>Ensure same proof cannot be used twice</description>
+      </test>
+    </security_tests>
+  </testing_strategy>
+
+  <deployment>
+    <environments>
+      <environment name="Development">
+        <status>✅ ACTIVE</status>
+        <backend>http://localhost:5001</backend>
+        <frontend>http://localhost:3000</frontend>
+        <blockchain>Local Hardhat Network</blockchain>
+      </environment>
+
+      <environment name="Testnet">
+        <status>🔄 NEXT</status>
+        <backend>TBD (Deploy to Vercel/Heroku)</backend>
+        <frontend>TBD (Deploy to Vercel)</frontend>
+        <blockchain>Sepolia Testnet</blockchain>
+        <contracts>
+          <PlonkVerifier>TBD (To be deployed)</PlonkVerifier>
+          <PrivateTransferV3>TBD (To be deployed)</PrivateTransferV3>
+        </contracts>
+      </environment>
+
+      <environment name="Mainnet">
+        <status>📅 FUTURE</status>
+        <backend>TBD (After security audit)</backend>
+        <frontend>TBD (Custom domain)</frontend>
+        <blockchain>Ethereum Mainnet</blockchain>
+      </environment>
+    </environments>
+
+    <deployment_checklist>
+      <phase_2_deployment>
+        <task>✅ Generate PLONK keys for enhanced circuit</task>
+        <task>✅ Test backend proof generation</task>
+        <task>⏳ Update frontend with address input</task>
+        <task>⏳ Deploy PlonkVerifier to Sepolia</task>
+        <task>⏳ Deploy PrivateTransferV3 to Sepolia</task>
+        <task>⏳ Update frontend with contract addresses</task>
+        <task>⏳ Test end-to-end on Sepolia</task>
+      </phase_2_deployment>
+    </deployment_checklist>
+  </deployment>
+
+  <known_issues>
+    <issue severity="LOW" status="RESOLVED">
+      <id>1</id>
+      <description>ethers.js v5/v6 conflict from circomlibjs dependency</description>
+      <solution>Use manual regex validation for addresses instead of ethers.isAddress()</solution>
+      <resolved_date>2024-11-06</resolved_date>
+    </issue>
+
+    <issue severity="MEDIUM" status="RESOLVED">
+      <id>2</id>
+      <description>Public signals order mismatch between circuit declaration and actual output</description>
+      <solution>Parse signals based on actual output order (assetId then maxAmount)</solution>
+      <resolved_date>2024-11-06</resolved_date>
+    </issue>
+
+    <issue severity="MEDIUM" status="RESOLVED">
+      <id>3</id>
+      <description>Commitment calculation mismatch (keccak256 vs Poseidon)</description>
+      <solution>Use circomlibjs Poseidon to match circuit</solution>
+      <resolved_date>2024-11-06</resolved_date>
+    </issue>
+  </known_issues>
+
+  <next_steps>
+    <immediate priority="CRITICAL">
+      <step order="1">
+        <title>Update Frontend for Ethereum Addresses</title>
+        <description>Replace recipientId input with recipientAddress input with validation</description>
+        <files>
+          <file>frontend/src/components/TransactionForm.js</file>
+          <file>frontend/src/components/TransactionForm.css</file>
+        </files>
+        <estimated_time>30 minutes</estimated_time>
+      </step>
+
+      <step order="2">
+        <title>Start Backend Server</title>
+        <description>Start production backend server for API testing</description>
+        <command>cd backend && npm start</command>
+        <expected_port>5001</expected_port>
+        <estimated_time>5 minutes</estimated_time>
+      </step>
+
+      <step order="3">
+        <title>Test Frontend to Backend Flow</title>
+        <description>Test proof generation from frontend UI</description>
+        <test_case>
+          <input>
+            <senderBalance>6000</senderBalance>
+            <transferAmount>95</transferAmount>
+            <recipientAddress>0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045</recipientAddress>
+            <assetId>1998</assetId>
+            <maxAmount>12000</maxAmount>
+          </input>
+          <expected_output>
+            <valid>true</valid>
+            <newBalance>5905</newBalance>
+            <proof>Generated successfully</proof>
+          </expected_output>
+        </test_case>
+        <estimated_time>15 minutes</estimated_time>
+      </step>
+
+      <step order="4">
+        <title>Deploy Contracts to Sepolia</title>
+        <description>Deploy PlonkVerifier and PrivateTransferV3 to Sepolia testnet</description>
+        <commands>
+          <command>npx hardhat clean</command>
+          <command>npx hardhat compile</command>
+          <command>npx hardhat run scripts/deploy-plonk.js --network sepolia</command>
+        </commands>
+        <requirements>
+          <requirement>Sepolia RPC URL in .env</requirement>
+          <requirement>Private key with testnet ETH</requirement>
+          <requirement>Etherscan API key for verification</requirement>
+        </requirements>
+        <estimated_time>20 minutes</estimated_time>
+      </step>
+
+      <step order="5">
+        <title>Update Frontend with Contract Addresses</title>
+        <description>Update deployed contract addresses in frontend config</description>
+        <file>frontend/src/config/contracts.js</file>
+        <estimated_time>5 minutes</estimated_time>
+      </step>
+
+      <step order="6">
+        <title>End-to-End Test on Sepolia</title>
+        <description>Complete transfer flow from UI to on-chain verification</description>
+        <steps>
+          <step>Generate proof in UI</step>
+          <step>Submit to backend</step>
+          <step>Receive proof</step>
+          <step>Submit to Sepolia contract</step>
+          <step>Verify TransferProofVerified event</step>
+        </steps>
+        <estimated_time>30 minutes</estimated_time>
+      </step>
+    </immediate>
+
+    <short_term priority="HIGH">
+      <enhancement>
+        <title>Implement Random Salt Generation</title>
+        <description>Replace fixed salt "12345" with cryptographically random values</description>
+        <estimated_time>1 hour</estimated_time>
+      </enhancement>
+
+      <enhancement>
+        <title>Add Frontend Error Handling</title>
+        <description>Improve error messages and user feedback</description>
+        <estimated_time>2 hours</estimated_time>
+      </enhancement>
+
+      <enhancement>
+        <title>Add Loading States</title>
+        <description>Show progress during proof generation (~700ms)</description>
+        <estimated_time>1 hour</estimated_time>
+      </enhancement>
+    </short_term>
+
+    <long_term priority="MEDIUM">
+      <enhancement>
+        <title>Nullifier System</title>
+        <description>Prevent double-spending with nullifier commitments</description>
+        <estimated_time>1 week</estimated_time>
+      </enhancement>
+
+      <enhancement>
+        <title>Merkle Tree Integration</title>
+        <description>Use Merkle trees for scalable balance commitments</description>
+        <estimated_time>1 week</estimated_time>
+      </enhancement>
+
+      <enhancement>
+        <title>Multi-Asset Support</title>
+        <description>Support ERC20, ERC721 transfers</description>
+        <estimated_time>2 weeks</estimated_time>
+      </enhancement>
+    </long_term>
+  </next_steps>
+
+  <development_guidelines>
+    <coding_standards>
+      <standard category="Solidity">
+        <rule>Use Solidity 0.8.x for built-in overflow protection</rule>
+        <rule>Follow OpenZeppelin contract patterns</rule>
+        <rule>Include NatSpec documentation</rule>
+        <rule>Gas optimization: minimize storage operations</rule>
+      </standard>
+
+      <standard category="Circom">
+        <rule>Comment all constraint logic</rule>
+        <rule>Use descriptive signal names</rule>
+        <rule>Document public vs private signals</rule>
+        <rule>Minimize constraint count</rule>
+      </standard>
+
+      <standard category="JavaScript/Node.js">
+        <rule>Use async/await for asynchronous operations</rule>
+        <rule>Validate all inputs</rule>
+        <rule>Include error handling in all API routes</rule>
+        <rule>Log important operations with timestamps</rule>
+      </standard>
+
+      <standard category="React">
+        <rule>Use functional components with hooks</rule>
+        <rule>Keep components small and focused</rule>
+        <rule>Validate user inputs before API calls</rule>
+        <rule>Show loading states for async operations</rule>
+      </standard>
+    </coding_standards>
+
+    <security_guidelines>
+      <guideline priority="CRITICAL">
+        <title>Never Expose Private Keys</title>
+        <description>Use environment variables for all sensitive data</description>
+      </guideline>
+
+      <guideline priority="CRITICAL">
+        <title>Validate All Inputs</title>
+        <description>Validate on frontend, backend, and smart contract</description>
+      </guideline>
+
+      <guideline priority="HIGH">
+        <title>Use Proper Random Number Generation</title>
+        <description>Use crypto.randomBytes() for salts, never Math.random()</description>
+      </guideline>
+
+      <guideline priority="HIGH">
+        <title>Audit Circuit Logic</title>
+        <description>Ensure all constraints are necessary and sufficient</description>
+      </guideline>
+
+      <guideline priority="MEDIUM">
+        <title>Rate Limiting</title>
+        <description>Implement rate limiting on API endpoints</description>
+      </guideline>
+    </security_guidelines>
+  </development_guidelines>
+
+  <resources>
+    <documentation>
+      <doc name="Circom Documentation" url="https://docs.circom.io/"/>
+      <doc name="snarkjs Documentation" url="https://github.com/iden3/snarkjs"/>
+      <doc name="PLONK Paper" url="https://eprint.iacr.org/2019/953.pdf"/>
+      <doc name="ethers.js v6 Docs" url="https://docs.ethers.org/v6/"/>
+      <doc name="Hardhat Docs" url="https://hardhat.org/docs"/>
+    </documentation>
+
+    <tools>
+      <tool name="circom" version="2.1.8" purpose="Circuit compilation"/>
+      <tool name="snarkjs" version="latest" purpose="Proof generation and verification"/>
+      <tool name="hardhat" version="latest" purpose="Smart contract development"/>
+      <tool name="VS Code" purpose="IDE with Circom extension"/>
+    </tools>
+
+    <community>
+      <link name="Circom Telegram" url="https://t.me/circom_discussions"/>
+      <link name="ZK Research Forum" url="https://zkresearch.com/"/>
+      <link name="Iden3 GitHub" url="https://github.com/iden3"/>
+    </community>
+  </resources>
+
+  <troubleshooting>
+    <common_issues>
+      <issue>
+        <problem>Circuit compilation fails with "Assert Failed"</problem>
+        <causes>
+          <cause>Constraint violation in circuit logic</cause>
+          <cause>Input values don't satisfy constraints</cause>
+          <cause>Commitment mismatch (hash function)</cause>
+        </causes>
+        <solutions>
+          <solution>Check input values match expected ranges</solution>
+          <solution>Verify commitment calculation matches circuit</solution>
+          <solution>Add debug logging to identify failing constraint</solution>
+        </solutions>
+      </issue>
+
+      <issue>
+        <problem>Proof generation takes too long (>5 seconds)</problem>
+        <causes>
+          <cause>Too many constraints in circuit</cause>
+          <cause>Insufficient RAM</cause>
+          <cause>Old WASM file cached</cause>
+        </causes>
+        <solutions>
+          <solution>Optimize circuit (reduce constraints)</solution>
+          <solution>Regenerate WASM file</solution>
+          <solution>Use more powerful hardware</solution>
+        </solutions>
+      </issue>
+
+      <issue>
+        <problem>Contract verification fails on Etherscan</problem>
+        <causes>
+          <cause>Incorrect compiler version</cause>
+          <cause>Missing optimization settings</cause>
+          <cause>Wrong constructor arguments</cause>
+        </causes>
+        <solutions>
+          <solution>Match hardhat.config.js compiler version</solution>
+          <solution>Enable optimizer with 200 runs</solution>
+          <solution>Verify constructor args match deployment</solution>
+        </solutions>
+      </issue>
+    </common_issues>
+  </troubleshooting>
+
+  <metrics>
+    <current_performance>
+      <metric name="Proof Generation Time" value="~728ms" status="✅ GOOD"/>
+      <metric name="Circuit Constraints" value="847" status="✅ REASONABLE"/>
+      <metric name="Proving Key Size" value="~3MB" status="✅ ACCEPTABLE"/>
+      <metric name="Gas Cost (Estimated)" value="~250K" status="⚠️ TO BE MEASURED"/>
+    </current_performance>
+
+    <target_performance>
+      <metric name="Proof Generation Time" target="<1s" priority="LOW"/>
+      <metric name="Circuit Constraints" target="<1000" priority="MEDIUM"/>
+      <metric name="Gas Cost" target="<200K" priority="HIGH"/>
+    </target_performance>
+  </metrics>
+
+  <changelog>
+    <version number="1.0.0" date="2024-11-06">
+      <change type="FEATURE">✅ Enhanced PLONK circuit with Poseidon commitments</change>
+      <change type="FEATURE">✅ Ethereum address support (160-bit)</change>
+      <change type="FEATURE">✅ Backend proof generation with addresses</change>
+      <change type="FEATURE">✅ Poseidon commitment calculation</change>
+      <change type="FIX">✅ Resolved ethers.js version conflict</change>
+      <change type="FIX">✅ Fixed public signals parsing order</change>
+      <change type="FIX">✅ Fixed commitment calculation (keccak → Poseidon)</change>
+    </version>
+  </changelog>
+</project>

@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+build/
+dist/
+artifacts/
+cache/
+claim_build/
+
+# Circuit files - large PTAU files
+circuits/plonk/powersOfTau28_hez_final_*.ptau
+circuits/pot*.ptau
+*.ptau
+
+# ZK proof files
+proof.json
+public.json
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*

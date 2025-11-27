@@ -1,0 +1,360 @@
+/* frontend/src/components/ClaimTransfer.css */
+
+.claim-transfer {
+  background: linear-gradient(135deg, #181b20 0%, #1e2329 100%);
+  border-radius: 20px;
+  padding: 0;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(56, 97, 251, 0.2);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.claim-transfer .form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 30px 30px 20px 30px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.claim-transfer .form-header h2 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  background: linear-gradient(135deg, #3861fb 0%, #a855f7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.claim-transfer .form-subtitle {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  margin: 0;
+}
+
+.claim-transfer .proof-badge {
+  background: linear-gradient(135deg, #3861fb 0%, #5078fc 100%);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(56, 97, 251, 0.3);
+}
+
+.claim-content {
+  padding: 30px;
+}
+
+.claim-transfer .form-group {
+  margin-bottom: 24px;
+}
+
+.claim-transfer .form-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.claim-transfer .label-hint {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.claim-transfer input[type="text"] {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(56, 97, 251, 0.3);
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.claim-transfer input[type="text"]:focus {
+  outline: none;
+  border-color: #3861fb;
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 3px rgba(56, 97, 251, 0.1);
+}
+
+.claim-transfer input[type="text"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.claim-transfer .input-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+}
+
+.check-button {
+  width: 100%;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #3861fb 0%, #5078fc 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.check-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(56, 97, 251, 0.4);
+}
+
+.check-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.check-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.claim-transfer .status-message {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.claim-transfer .status-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.claim-transfer .status-text {
+  flex: 1;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.transfer-info {
+  background: rgba(56, 97, 251, 0.1);
+  border: 1px solid rgba(56, 97, 251, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.transfer-info h4 {
+  margin: 0 0 16px 0;
+  color: #3861fb;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.transfer-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.transfer-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.transfer-stat:last-child {
+  border-bottom: none;
+}
+
+.transfer-stat .stat-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+}
+
+.transfer-stat .stat-value {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.claim-button {
+  width: 100%;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #f0b90b 0%, #f8d12f 100%);
+  color: #1e2329;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.claim-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(240, 185, 11, 0.4);
+}
+
+.claim-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.claim-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.claim-button .spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(30, 35, 41, 0.3);
+  border-top-color: #1e2329;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.claim-transfer .warning-message {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: #ef4444;
+  font-size: 14px;
+  text-align: center;
+  margin-top: 16px;
+}
+
+.claim-transfer .form-footer {
+  padding: 24px 30px 30px 30px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.claim-transfer .privacy-note {
+  background: rgba(56, 97, 251, 0.1);
+  border: 1px solid rgba(56, 97, 251, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.claim-transfer .privacy-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.claim-transfer .privacy-text {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.claim-transfer .privacy-text strong {
+  color: #3861fb;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.claim-transfer .contract-info {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.claim-transfer .contract-info h4 {
+  margin: 0 0 12px 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.claim-transfer .contract-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.claim-transfer .contract-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.claim-transfer .detail-label {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.claim-transfer .detail-value {
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.claim-transfer .detail-link {
+  color: #3861fb;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.claim-transfer .detail-link:hover {
+  color: #5078fc;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .claim-transfer {
+    border-radius: 16px;
+  }
+
+  .claim-content {
+    padding: 20px;
+  }
+
+  .claim-transfer .form-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .claim-transfer .form-header h2 {
+    font-size: 24px;
+  }
+}

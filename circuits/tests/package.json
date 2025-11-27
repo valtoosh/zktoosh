@@ -1,0 +1,15 @@
+{
+  "name": "zkult-circuit-tests",
+  "version": "1.0.0",
+  "description": "Tests for zkUlt PLONK circuits",
+  "scripts": {
+    "test": "mocha --require @babel/register",
+    "test:watch": "mocha --require @babel/register --watch"
+  },
+  "dependencies": {
+    "circom_tester": "^0.0.19",
+    "circomlibjs": "^0.1.7",
+    "mocha": "^10.2.0",
+    "chai": "^4.3.10"
+  }
+}

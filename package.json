@@ -1,0 +1,40 @@
+{
+  "name": "zkult",
+  "version": "1.0.0",
+  "description": "Privacy-Preserving Asset Transfer with PLONK Zero-Knowledge Proofs",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm start",
+    "dev:frontend": "cd frontend && npm start",
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "test:circuits": "cd circuits/tests && npm test",
+    "deploy:sepolia": "npx hardhat run scripts/deploy-plonk.js --network sepolia",
+    "deploy:local": "npx hardhat run scripts/deploy-plonk.js --network localhost",
+    "node": "npx hardhat node",
+    "clean": "npx hardhat clean && rm -rf cache artifacts"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.11",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "chai": "^4.5.0",
+    "concurrently": "^8.2.2",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.4",
+    "hardhat": "^2.22.15"
+  },
+  "dependencies": {
+    "circomlib": "^2.0.5",
+    "snarkjs": "^0.7.4"
+  }
+}

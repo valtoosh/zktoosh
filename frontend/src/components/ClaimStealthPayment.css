@@ -1,0 +1,311 @@
+/* Claim Stealth Payment Component Styles */
+
+.claim-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.claim-header {
+  background: linear-gradient(135deg, #1a1f35 0%, #2d1b4e 100%);
+  border-radius: 16px;
+  padding: 30px;
+  margin-bottom: 25px;
+  border: 1px solid rgba(61, 133, 251, 0.2);
+  box-shadow: 0 8px 32px rgba(61, 133, 251, 0.1);
+}
+
+.claim-header h2 {
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #3d85fb 0%, #a855f7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 12px 0;
+}
+
+.claim-subtitle {
+  color: #a0aec0;
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.claim-section {
+  background: linear-gradient(135deg, #1a2332 0%, #1f2937 100%);
+  border-radius: 16px;
+  padding: 25px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.claim-section h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 15px 0;
+}
+
+.claim-hint {
+  color: #718096;
+  font-size: 14px;
+  margin-bottom: 15px;
+}
+
+.claim-input-group {
+  display: flex;
+  gap: 12px;
+}
+
+.claim-input {
+  flex: 1;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.claim-input:focus {
+  outline: none;
+  border-color: #3d85fb;
+  background: rgba(61, 133, 251, 0.05);
+}
+
+.claim-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.claim-button {
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.claim-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.claim-button.primary {
+  background: linear-gradient(135deg, #3d85fb 0%, #5a9ffd 100%);
+  color: #fff;
+}
+
+.claim-button.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(61, 133, 251, 0.4);
+}
+
+.claim-button.secondary {
+  background: linear-gradient(135deg, #6b46c1 0%, #8b5cf6 100%);
+  color: #fff;
+  width: 100%;
+}
+
+.claim-button.secondary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+}
+
+.claim-button.claim-action {
+  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  color: #fff;
+  width: 100%;
+  margin-top: 20px;
+}
+
+.claim-button.claim-action:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.claim-button.small {
+  padding: 8px 16px;
+  font-size: 14px;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.claim-status {
+  padding: 15px 20px;
+  border-radius: 12px;
+  margin: 20px 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.claim-status.success {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.claim-status.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.payment-info-panel {
+  background: linear-gradient(135deg, #1a2332 0%, #1f2937 100%);
+  border-radius: 16px;
+  padding: 25px;
+  margin-top: 20px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.payment-info-panel h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #10b981;
+  margin: 0 0 20px 0;
+}
+
+.payment-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+.payment-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.payment-info-item label {
+  color: #a0aec0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.payment-info-item code {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.payment-info-item code.claimed {
+  color: #10b981;
+}
+
+.payment-info-item code.unclaimed {
+  color: #f59e0b;
+}
+
+.all-payments-panel {
+  background: linear-gradient(135deg, #1a2332 0%, #1f2937 100%);
+  border-radius: 16px;
+  padding: 25px;
+  margin-top: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.all-payments-panel h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 20px 0;
+}
+
+.payments-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
+}
+
+.payment-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s;
+}
+
+.payment-card.unclaimed {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.payment-card.claimed {
+  opacity: 0.6;
+}
+
+.payment-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.payment-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.payment-index {
+  color: #a0aec0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.payment-status {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.payment-status.unclaimed {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.payment-status.claimed {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.payment-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.payment-card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.payment-card-item label {
+  color: #718096;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.payment-card-item code {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.payment-card-item span {
+  color: #a0aec0;
+  font-size: 13px;
+}
