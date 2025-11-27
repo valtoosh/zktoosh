@@ -1,1 +1,17 @@
 *.zkey filter=lfs diff=lfs merge=lfs -text
+
+# Exclude auto-generated Circom C++ code from language statistics
+circuits/**/*_cpp/** linguist-generated=true
+circuits/**/claim_build/** linguist-generated=true
+circuits/**/transfer_phase4_js/** linguist-generated=true
+circuits/**/transfer_js/** linguist-generated=true
+circuits/**/transfer-phase6_js/** linguist-generated=true
+
+# Mark compiled artifacts as vendored
+*.wasm linguist-vendored
+*.r1cs linguist-vendored
+*.sym linguist-vendored
+*.dat linguist-vendored
+
+# Mark documentation as documentation
+*.md linguist-documentation
