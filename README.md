@@ -229,18 +229,19 @@ await contract.privateTransfer(withdrawProof, publicSignals);
 
 ## 🌐 Deployed Contracts (Sepolia Testnet)
 
-### Current Deployment (Phase 6 - Complete)
+### Current Deployment (Phase 6 - ECDH Complete)
 
 | Contract | Address | Status |
 |----------|---------|--------|
-| **Transfer Verifier** | [`0x88E6A90c...B394B`](https://sepolia.etherscan.io/address/0x88E6A90c099809647c5164464f980E8109bB394B) | ✅ Verified |
-| **Claim Verifier** | [`0x63Ade6E4...b4C1C`](https://sepolia.etherscan.io/address/0x63Ade6E45c012E336DC1A5297EBaD8a8369b4C1C) | ✅ Verified |
-| **Poseidon** | [`0x3b3B814C...265B0`](https://sepolia.etherscan.io/address/0x3b3B814C9D26B3Aad586F6BA326808A0A4d265B0) | ✅ Verified |
-| **PrivateTransferV4** | [`0x51cC96fF...14903`](https://sepolia.etherscan.io/address/0x51cC96fFD6cA1B73e18030Aa78A62699F2b14903) | ✅ Verified |
+| **PlonkVerifierPhase6** | [`0x64847a91...D43`](https://sepolia.etherscan.io/address/0x64847a91255862651BE31Def6Ff9522EA12baD43) | ✅ Verified |
+| **ClaimVerifier** | [`0x0318639C...776d`](https://sepolia.etherscan.io/address/0x0318639CE5300BF8f8358E48eD21bfF9e717776d) | ✅ Verified |
+| **Poseidon** | [`0xcBeAc8Fc...20aa`](https://sepolia.etherscan.io/address/0xcBeAc8FcB935C067887D9fe9529b6d36Ef9920aa) | ✅ Verified |
+| **PrivateTransferV4** | [`0x90a84979...1AA`](https://sepolia.etherscan.io/address/0x90a8497926Bb1fd17A43fb3B0bF493a701EF81AA) | ✅ Verified |
 
-**Deployment Date:** November 27, 2025
+**Deployment Date:** December 3, 2025 (ECDH Fixes Applied)
 **Network:** Sepolia Testnet
-**Complete Flow:** ✅ Tested (Deposit → Transfer → Claim → Withdraw)
+**Complete Flow:** ✅ Tested & Verified (Deposit → Transfer → Claim → Withdraw)
+**E2E Transactions:** 4/4 successful on-chain ✅
 
 ### On-Chain Verification
 
@@ -547,8 +548,30 @@ For issues or questions:
 
 ---
 
-**Status:** Phase 6 Complete ✅ | Deployed on Sepolia Testnet
-**Latest:** Complete Monero-style privacy flow working end-to-end 🎉
-**Repository:** https://github.com/valtoosh/zktoosh
+## 🎉 Latest Update (December 3, 2025)
 
-**Privacy Verified On-Chain:** Only 1 stealth payment for 1 transfer (deposits excluded) ✅
+### ECDH Stealth Address System - Fully Functional ✅
+
+**Major Accomplishments:**
+- ✅ Fixed ECDH key derivation (Base8 generator synchronized)
+- ✅ Claim circuit verification working correctly
+- ✅ Complete E2E flow tested on Sepolia (4/4 transactions successful)
+- ✅ Withdraw UI fixed with input fields
+- ✅ All Phase 6 research objectives verified working
+
+**Critical Fix Applied:**
+- Base8 Generator (5299...) now synchronized between Circom circuits and JavaScript frontend
+- Both transfer and claim circuits use proper BabyJubJub scalar multiplication
+- Shared secret computation now cryptographically consistent
+
+**Status:** Phase 6 Complete ✅ | ECDH Tested ✅ | Deployed on Sepolia Testnet ✅
+**Latest:** Full Monero-style ECDH stealth address system working end-to-end 🚀
+**Repository:** https://github.com/valtoosh/zkphase
+
+**Flow Verification (Sepolia):**
+- Deposit: 0.01 ETH ✅
+- Transfer: 9 ENA with stealth address ✅
+- Claim: ZK proof verified on-chain ✅
+- Withdraw: 0.009 ETH to wallet ✅
+
+**Ready for:** Research paper documentation | Security audit | Production deployment
