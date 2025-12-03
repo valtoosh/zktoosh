@@ -19,7 +19,7 @@ async function main() {
   // ============================================
 
   console.log('📝 Deploying PlonkVerifierPhase6...');
-  const PlonkVerifierPhase6 = await hre.ethers.getContractFactory("PlonkVerifierPhase6");
+  const PlonkVerifierPhase6 = await hre.ethers.getContractFactory("contracts/plonk/PlonkVerifierPhase6.sol:PlonkVerifier");
   const verifier = await PlonkVerifierPhase6.deploy();
   await verifier.waitForDeployment();
 

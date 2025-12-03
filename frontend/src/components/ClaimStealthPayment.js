@@ -22,14 +22,13 @@ const ClaimStealthPayment = ({ account, provider }) => {
   const [viewPrivateKey, setViewPrivateKey] = useState('');
   const [spendPrivateKey, setSpendPrivateKey] = useState('');
   const [viewPublicKey, setViewPublicKey] = useState('');
-  const [detectedPayments, setDetectedPayments] = useState([]);
-
-  // For manual claiming (when auto-detection doesn't work)
+  
+  // For manual claiming
   const [transferAmount, setTransferAmount] = useState('');
   const [stealthSalt, setStealthSalt] = useState('');
-  const [assetId, setAssetId] = useState('1998'); // Default to ENA
+  const [assetId, setAssetId] = useState('1998');
 
-  // Auto-load keys from storage on mount
+  // Auto-load keys
   useEffect(() => {
     const keys = keyManagement.loadKeys();
     if (keys) {
@@ -42,6 +41,7 @@ const ClaimStealthPayment = ({ account, provider }) => {
     }
   }, []);
 
+  // --- 1. CHECK PAYMENT (Single) ---
   const checkPayment = async () => {
     if (!stealthAddress) {
       alert('Please enter a stealth address');
@@ -55,26 +55,29 @@ const ClaimStealthPayment = ({ account, provider }) => {
       const contract = new ethers.Contract(
         PHASE6_CONFIG.transferAddress,
         [
-          'function stealthPayments(uint256) external view returns (uint256 stealthAddress, uint256 ephemeralPublicKey, uint256 timestamp, bytes32 encryptedMemo, bool claimed)',
-          'function isStealthAddressUnclaimed(uint256) external view returns (bool)'
+          'function getStealthPayment(uint256 index) external view returns (uint256 stealthAddr, uint256[2] ephemeralPubKey, bytes32 memo, uint256 timestamp, bool claimed)',
+          'function stealthPayments(uint256) external view returns (uint256 stealthAddress, uint256[2] ephemeralPublicKey, uint256 encryptedAmount, uint256 timestamp, bytes32 encryptedMemo, bool claimed)'
         ],
         provider
       );
 
+      // We use the mapping getter. Note: Struct returns tuple.
+      // ephemeralPublicKey is uint256[2]
       const payment = await contract.stealthPayments(stealthAddress);
-      const isUnclaimed = await contract.isStealthAddressUnclaimed(stealthAddress);
 
       if (payment.timestamp.toString() === '0') {
         setStatus('❌ No payment found for this stealth address');
         setPaymentInfo(null);
       } else {
+        // Format the key nicely
+        const ephKey = [payment.ephemeralPublicKey[0].toString(), payment.ephemeralPublicKey[1].toString()];
+        
         setPaymentInfo({
           stealthAddress: payment.stealthAddress.toString(),
-          ephemeralPublicKey: payment.ephemeralPublicKey.toString(),
+          ephemeralPublicKey: ephKey, // Store as Array [x, y]
           timestamp: new Date(Number(payment.timestamp) * 1000).toLocaleString(),
           encryptedMemo: payment.encryptedMemo,
-          claimed: payment.claimed,
-          isUnclaimed
+          claimed: payment.claimed
         });
         setStatus(payment.claimed ? '✅ Payment found (already claimed)' : '✅ Payment found (unclaimed)');
       }
@@ -86,6 +89,7 @@ const ClaimStealthPayment = ({ account, provider }) => {
     }
   };
 
+  // --- 2. SCAN ALL PAYMENTS ---
   const scanAllPayments = async () => {
     if (!provider) {
       alert('Please connect your wallet');
@@ -99,7 +103,8 @@ const ClaimStealthPayment = ({ account, provider }) => {
       const contract = new ethers.Contract(
         PHASE6_CONFIG.transferAddress,
         [
-          'event StealthPaymentCreated(uint256 indexed stealthAddress, uint256 ephemeralPublicKey, bytes32 encryptedMemo, uint256 timestamp)'
+          // Updated Event Signature for ECDH (uint256[2])
+          'event StealthPaymentCreated(uint256 indexed stealthAddress, uint256[2] ephemeralPublicKey, bytes32 encryptedMemo, uint256 timestamp)'
         ],
         provider
       );
@@ -107,20 +112,28 @@ const ClaimStealthPayment = ({ account, provider }) => {
       console.log('🔍 Scanning for StealthPaymentCreated events...');
   
       const filter = contract.filters.StealthPaymentCreated();
-      const events = await contract.queryFilter(filter, 0, 'latest');
+      const events = await contract.queryFilter(filter, 0, 'latest'); // In prod, limit range
   
       console.log(`Found ${events.length} stealth payment event(s)`);
   
-      const payments = events.map((event, index) => ({
-        index,
-        stealthAddress: event.args.stealthAddress.toString(),
-        ephemeralPublicKey: event.args.ephemeralPublicKey.toString(),
-        encryptedMemo: event.args.encryptedMemo,
-        timestamp: new Date(Number(event.args.timestamp) * 1000).toLocaleString(),
-        blockNumber: event.blockNumber,
-        txHash: event.transactionHash,
-        claimed: false  // We'll check this separately if needed
-      }));
+      const payments = events.map((event, index) => {
+        // event.args.ephemeralPublicKey is a Proxy/Array of BigInts
+        const ephKey = [
+            event.args.ephemeralPublicKey[0].toString(),
+            event.args.ephemeralPublicKey[1].toString()
+        ];
+
+        return {
+            index,
+            stealthAddress: event.args.stealthAddress.toString(),
+            ephemeralPublicKey: ephKey,
+            encryptedMemo: event.args.encryptedMemo,
+            timestamp: new Date(Number(event.args.timestamp) * 1000).toLocaleString(),
+            blockNumber: event.blockNumber,
+            txHash: event.transactionHash,
+            claimed: false // Note: Events don't tell us if it's claimed later. Need to check state.
+        };
+      });
   
       setAllPayments(payments);
   
@@ -137,62 +150,55 @@ const ClaimStealthPayment = ({ account, provider }) => {
     }
   };
 
+  // --- 3. CLAIM PAYMENT ---
   const claimPaymentWithZKProof = async () => {
-    // Validate inputs
     if (!paymentInfo || paymentInfo.claimed) {
       alert('No unclaimed payment to claim');
       return;
     }
-
     if (!transferAmount || !stealthSalt) {
-      alert('Please enter the transfer amount and stealth salt (received from sender)');
+      alert('Please enter the transfer amount and stealth salt');
       return;
     }
-
     if (!viewPrivateKey || !spendPrivateKey) {
-      alert('No keys found. Please generate keys first in the Transfer tab.');
+      alert('No keys found.');
       return;
     }
 
     setLoading(true);
-    setStatus('🔐 Generating Monero-style ZK claiming proof...');
+    setStatus('🔐 Generating Monero-style ZK claiming proof (ECDH)...');
 
     try {
-      // Step 1: Generate ZK proof via backend (MONERO-STYLE)
-      console.log('📨 Sending Monero-style claim proof request to backend...');
+      console.log('📨 Sending claim proof request...');
       console.log('   Stealth Address:', stealthAddress);
-      console.log('   Transfer Amount:', transferAmount);
-      console.log('   Asset ID:', assetId);
+      console.log('   Ephemeral Key:', paymentInfo.ephemeralPublicKey); // Should be [x, y]
 
       const proofResponse = await fetch(`${BACKEND_URL}/api/claim/generate-proof`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          viewPrivateKey: viewPrivateKey,              // MONERO-STYLE
-          spendPrivateKey: spendPrivateKey,            // MONERO-STYLE
+          viewPrivateKey: viewPrivateKey,
+          spendPrivateKey: spendPrivateKey,
           transferAmount: transferAmount,
           stealthSalt: stealthSalt,
-          ephemeralPublicKey: paymentInfo.ephemeralPublicKey,
+          ephemeralPublicKey: paymentInfo.ephemeralPublicKey, // Sends Array [x, y]
           assetId: assetId,
           stealthAddress: stealthAddress
         })
       });
 
       if (!proofResponse.ok) {
-        throw new Error(`Proof generation failed: ${proofResponse.statusText}`);
+        const err = await proofResponse.json();
+        throw new Error(err.message || `Proof generation failed: ${proofResponse.statusText}`);
       }
 
       const proofData = await proofResponse.json();
-
-      if (!proofData.success) {
-        throw new Error(proofData.error || 'Proof generation failed');
-      }
+      if (!proofData.success) throw new Error(proofData.error);
 
       console.log('✅ Claim proof generated successfully');
 
-      // Step 2: Format proof for contract
+      // Format for contract
       setStatus('📝 Formatting proof for contract...');
-
       const formatResponse = await fetch(`${BACKEND_URL}/api/claim/format-for-contract`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -202,22 +208,11 @@ const ClaimStealthPayment = ({ account, provider }) => {
         })
       });
 
-      if (!formatResponse.ok) {
-        throw new Error(`Proof formatting failed: ${formatResponse.statusText}`);
-      }
-
+      if (!formatResponse.ok) throw new Error('Proof formatting failed');
       const formattedData = await formatResponse.json();
 
-      if (!formattedData.success) {
-        throw new Error(formattedData.error || 'Proof formatting failed');
-      }
-
-      console.log('✅ Proof formatted for contract');
-      console.log('   Proof elements:', formattedData.proof.length);
-      console.log('   Public signals:', formattedData.publicSignals.length);
-
-      // Step 4: Submit claim with ZK proof
-      setStatus('📡 Submitting claim with ZK proof...');
+      console.log('✅ Proof formatted. Submitting transaction...');
+      setStatus('📡 Submitting claim to blockchain...');
 
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(
@@ -229,18 +224,14 @@ const ClaimStealthPayment = ({ account, provider }) => {
       const tx = await contract.claimStealthPayment(formattedData.proof, formattedData.publicSignals);
       setStatus(`⏳ Waiting for confirmation... TX: ${tx.hash}`);
 
-      const receipt = await tx.wait();
-      setStatus(`✅ Payment claimed successfully! Funds credited to your balance.\n🔗 TX: ${tx.hash}`);
+      await tx.wait();
+      setStatus(`✅ Payment claimed successfully! TX: ${tx.hash}`);
 
-      // Update payment info
       setPaymentInfo(prev => ({ ...prev, claimed: true }));
-
-      // Refresh balance after claiming
       await fetchUserBalance();
-
-      // Clear sensitive inputs
       setTransferAmount('');
       setStealthSalt('');
+
     } catch (error) {
       console.error('❌ Claim error:', error);
       setStatus(`❌ Claim failed: ${error.message}`);
@@ -251,17 +242,13 @@ const ClaimStealthPayment = ({ account, provider }) => {
 
   const fetchUserBalance = async () => {
     if (!account || !provider) return;
-
     try {
       const contract = new ethers.Contract(
         PHASE6_CONFIG.transferAddress,
         ['function balances(address) external view returns (uint256)'],
         provider
       );
-
       const balance = await contract.balances(account);
-      console.log('📊 Balance fetched from contract:', balance.toString(), 'wei');
-      console.log('📊 Balance in ETH:', ethers.formatEther(balance));
       setUserBalance(ethers.formatEther(balance));
     } catch (error) {
       console.error('❌ Error fetching balance:', error);
@@ -270,19 +257,10 @@ const ClaimStealthPayment = ({ account, provider }) => {
 
   const handleWithdraw = async () => {
     if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
-      alert('Please enter a valid withdrawal amount');
+      alert('Enter valid amount');
       return;
     }
-
-    const recipient = withdrawRecipient || account;
-    if (!recipient) {
-      alert('Please enter a recipient address');
-      return;
-    }
-
     setLoading(true);
-    setStatus('💸 Processing withdrawal...');
-
     try {
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(
@@ -290,27 +268,18 @@ const ClaimStealthPayment = ({ account, provider }) => {
         ['function withdraw(uint256, address payable) external'],
         signer
       );
-
-      const amountInWei = ethers.parseEther(withdrawAmount);
-      const tx = await contract.withdraw(amountInWei, recipient);
-      setStatus(`⏳ Waiting for confirmation... TX: ${tx.hash}`);
-
-      const receipt = await tx.wait();
-      setStatus(`✅ Withdrawal successful! Sent ${withdrawAmount} ETH to ${recipient}`);
-
-      // Clear form and refresh balance
+      const tx = await contract.withdraw(ethers.parseEther(withdrawAmount), withdrawRecipient || account);
+      await tx.wait();
+      setStatus(`✅ Withdrawal successful!`);
       setWithdrawAmount('');
-      setWithdrawRecipient('');
       await fetchUserBalance();
     } catch (error) {
-      console.error('Error withdrawing:', error);
       setStatus(`❌ Withdrawal failed: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch user balance on mount
   React.useEffect(() => {
     fetchUserBalance();
   }, [account, provider]);
@@ -319,9 +288,7 @@ const ClaimStealthPayment = ({ account, provider }) => {
     <div className="claim-container">
       <div className="claim-header">
         <h2>🎁 Claim Stealth Payment</h2>
-        <p className="claim-subtitle">
-          Enter the stealth address you received to check and claim your payment
-        </p>
+        <p className="claim-subtitle">ECDH Privacy Enabled</p>
       </div>
 
       <div className="claim-section">
@@ -329,17 +296,13 @@ const ClaimStealthPayment = ({ account, provider }) => {
         <div className="claim-input-group">
           <input
             type="text"
-            placeholder="Enter stealth address (e.g., 12345...)"
+            placeholder="Enter stealth address"
             value={stealthAddress}
             onChange={(e) => setStealthAddress(e.target.value)}
             disabled={loading}
             className="claim-input"
           />
-          <button
-            onClick={checkPayment}
-            disabled={loading || !account}
-            className="claim-button primary"
-          >
+          <button onClick={checkPayment} disabled={loading || !account} className="claim-button primary">
             {loading ? '⏳ Checking...' : '🔍 Check Payment'}
           </button>
         </div>
@@ -347,23 +310,12 @@ const ClaimStealthPayment = ({ account, provider }) => {
 
       <div className="claim-section">
         <h3>🌐 Scan All Payments</h3>
-        <p className="claim-hint">
-          Scan the blockchain for all stealth payments (this may take a moment)
-        </p>
-        <button
-          onClick={scanAllPayments}
-          disabled={scanning || !account}
-          className="claim-button secondary"
-        >
+        <button onClick={scanAllPayments} disabled={scanning || !account} className="claim-button secondary">
           {scanning ? '⏳ Scanning...' : '🔍 Scan Blockchain'}
         </button>
       </div>
 
-      {status && (
-        <div className={`claim-status ${status.includes('❌') ? 'error' : status.includes('✅') ? 'success' : ''}`}>
-          {status}
-        </div>
-      )}
+      {status && <div className="claim-status">{status}</div>}
 
       {paymentInfo && (
         <div className="payment-info-panel">
@@ -371,75 +323,37 @@ const ClaimStealthPayment = ({ account, provider }) => {
           <div className="payment-info-grid">
             <div className="payment-info-item">
               <label>Stealth Address:</label>
-              <code>{paymentInfo.stealthAddress.slice(0, 20)}...{paymentInfo.stealthAddress.slice(-10)}</code>
+              <code>{paymentInfo.stealthAddress.slice(0, 15)}...</code>
             </div>
             <div className="payment-info-item">
-              <label>Ephemeral Public Key:</label>
-              <code>{paymentInfo.ephemeralPublicKey.slice(0, 20)}...{paymentInfo.ephemeralPublicKey.slice(-10)}</code>
-            </div>
-            <div className="payment-info-item">
-              <label>Timestamp:</label>
-              <code>{paymentInfo.timestamp}</code>
+              <label>Ephemeral Key:</label>
+              <code>{JSON.stringify(paymentInfo.ephemeralPublicKey).slice(0, 20)}...</code>
             </div>
             <div className="payment-info-item">
               <label>Status:</label>
-              <code className={paymentInfo.claimed ? 'claimed' : 'unclaimed'}>
-                {paymentInfo.claimed ? '✅ Claimed' : '🎁 Unclaimed'}
-              </code>
+              <code>{paymentInfo.claimed ? '✅ Claimed' : '🎁 Unclaimed'}</code>
             </div>
           </div>
 
           {!paymentInfo.claimed && (
             <div style={{ marginTop: '20px' }}>
-              <div style={{
-                background: 'rgba(59, 130, 246, 0.1)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                borderRadius: '8px',
-                padding: '12px',
-                marginBottom: '16px'
-              }}>
-                <p style={{ color: '#3b82f6', fontSize: '14px', margin: 0 }}>
-                  🔐 <strong>ZK Claiming Proof Required</strong>
-                </p>
-                <p style={{ color: '#a0aec0', fontSize: '13px', margin: '8px 0 0 0' }}>
-                  To claim this payment with fund transfer, you need the transfer amount and stealth salt. The sender should have shared these with you off-chain (e.g., via encrypted messaging).
-                </p>
-              </div>
-
-              <h4 style={{ color: '#f3f4f6', marginBottom: '12px' }}>Claiming Parameters (from sender)</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
-                <input
-                  type="number"
-                  placeholder="Transfer Amount (e.g., 500 for 500 ENA)"
-                  value={transferAmount}
-                  onChange={(e) => setTransferAmount(e.target.value)}
-                  disabled={loading}
-                  className="claim-input"
-                />
-                <input
-                  type="text"
-                  placeholder="Stealth Salt (big number from sender)"
-                  value={stealthSalt}
-                  onChange={(e) => setStealthSalt(e.target.value)}
-                  disabled={loading}
-                  className="claim-input"
-                />
-                <input
-                  type="number"
-                  placeholder="Asset ID (default: 1998 for ENA)"
-                  value={assetId}
-                  onChange={(e) => setAssetId(e.target.value)}
-                  disabled={loading}
-                  className="claim-input"
-                />
-              </div>
-
-              <button
-                onClick={claimPaymentWithZKProof}
-                disabled={loading || !transferAmount || !stealthSalt}
-                className="claim-button claim-action"
-              >
-                {loading ? '⏳ Claiming...' : '🔐 Claim with ZK Proof'}
+              <h4>Claiming Parameters</h4>
+              <input
+                type="number"
+                placeholder="Transfer Amount"
+                value={transferAmount}
+                onChange={(e) => setTransferAmount(e.target.value)}
+                className="claim-input"
+              />
+              <input
+                type="text"
+                placeholder="Stealth Salt"
+                value={stealthSalt}
+                onChange={(e) => setStealthSalt(e.target.value)}
+                className="claim-input"
+              />
+              <button onClick={claimPaymentWithZKProof} disabled={loading} className="claim-button claim-action">
+                🔐 Claim with ZK Proof
               </button>
             </div>
           )}
@@ -451,74 +365,37 @@ const ClaimStealthPayment = ({ account, provider }) => {
           <h3>📜 All Stealth Payments</h3>
           <div className="payments-list">
             {allPayments.map((payment) => (
-              <div key={payment.index} className={`payment-card ${payment.claimed ? 'claimed' : 'unclaimed'}`}>
-                <div className="payment-card-header">
-                  <span className="payment-index">#{payment.index}</span>
-                  <span className={`payment-status ${payment.claimed ? 'claimed' : 'unclaimed'}`}>
-                    {payment.claimed ? '✅ Claimed' : '🎁 Unclaimed'}
-                  </span>
-                </div>
-                <div className="payment-card-body">
-                  <div className="payment-card-item">
-                    <label>Stealth Address:</label>
-                    <code>{payment.stealthAddress.slice(0, 15)}...{payment.stealthAddress.slice(-8)}</code>
-                  </div>
-                  <div className="payment-card-item">
-                    <label>Time:</label>
-                    <span>{payment.timestamp}</span>
-                  </div>
-                  {!payment.claimed && (
-                    <button
-                      onClick={() => {
-                        setStealthAddress(payment.stealthAddress);
-                        setPaymentInfo({
-                          stealthAddress: payment.stealthAddress,
-                          ephemeralPublicKey: payment.ephemeralPublicKey,
-                          timestamp: payment.timestamp,
-                          encryptedMemo: payment.encryptedMemo,
-                          claimed: payment.claimed,
-                          isUnclaimed: true
-                        });
-                      }}
-                      className="claim-button small"
-                    >
-                      Select to Claim
-                    </button>
-                  )}
-                </div>
+              <div key={payment.index} className="payment-card">
+                <span>#{payment.index} - {payment.stealthAddress.slice(0,10)}...</span>
+                <button className="claim-button small" onClick={() => {
+                    setStealthAddress(payment.stealthAddress);
+                    setPaymentInfo({
+                        stealthAddress: payment.stealthAddress,
+                        ephemeralPublicKey: payment.ephemeralPublicKey,
+                        timestamp: payment.timestamp,
+                        encryptedMemo: payment.encryptedMemo,
+                        claimed: payment.claimed
+                    });
+                }}>Select</button>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      <div className="claim-section" style={{ marginTop: '30px', background: 'linear-gradient(135deg, #1a2332 0%, #1f2937 100%)' }}>
+      
+      <div className="claim-section">
         <h3>💰 Withdraw ETH</h3>
-        <p className="claim-hint">
-          Your Balance: <strong>{userBalance} ETH</strong>
-        </p>
-        <div style={{
-          background: 'rgba(34, 197, 94, 0.1)',
-          border: '1px solid rgba(34, 197, 94, 0.3)',
-          borderRadius: '8px',
-          padding: '12px',
-          marginBottom: '12px'
-        }}>
-          <p style={{ color: '#22c55e', fontSize: '14px', margin: 0 }}>
-            ✅ <strong>ZK Claiming Enabled:</strong> When you claim a stealth payment with ZK proof, funds are automatically credited to your withdrawable balance.
-          </p>
-          <p style={{ color: '#a0aec0', fontSize: '13px', margin: '8px 0 0 0' }}>
-            Your balance includes both deposited ETH and claimed stealth payments. You can withdraw anytime.
-          </p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <p className="claim-subtitle">Your Balance: <strong>{userBalance} ETH</strong></p>
+        <div className="claim-input-group">
           <input
-            type="text"
+            type="number"
             placeholder="Amount to withdraw (ETH)"
             value={withdrawAmount}
             onChange={(e) => setWithdrawAmount(e.target.value)}
             disabled={loading}
             className="claim-input"
+            step="0.001"
+            min="0"
           />
           <input
             type="text"
@@ -528,11 +405,7 @@ const ClaimStealthPayment = ({ account, provider }) => {
             disabled={loading}
             className="claim-input"
           />
-          <button
-            onClick={handleWithdraw}
-            disabled={loading || !account}
-            className="claim-button claim-action"
-          >
+          <button onClick={handleWithdraw} disabled={loading} className="claim-button primary">
             {loading ? '⏳ Withdrawing...' : '💸 Withdraw ETH'}
           </button>
         </div>

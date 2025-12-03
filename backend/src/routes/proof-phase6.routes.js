@@ -58,8 +58,8 @@ router.post('/generate', proofGenerationLimiter, async (req, res) => {
     const input = {
       senderBalance: Number(senderBalance),
       transferAmount: Number(transferAmount),
-      recipientViewPublicKey: String(recipient),  // MONERO-STYLE: Use view public key
-      recipientAddress: String(recipient),        // Keep for backward compatibility
+      recipientViewPublicKey: recipient,  // ECDH: Preserve array format [x, y]
+      recipientAddress: recipient,        // Keep for backward compatibility
       assetId: Number(assetId),
       maxAmount: Number(maxAmount),
       salt: salt,
@@ -183,10 +183,10 @@ router.post('/format-for-contract', async (req, res) => {
     console.log('\n📝 Formatting Phase 6 proof for contract...');
     console.log('📊 Input proof keys:', Object.keys(proof));
     console.log('📊 Input publicSignals length:', publicSignals.length);
-    console.log('📊 Expected: 17 public signals (Phase 6)');
+    console.log('📊 Expected: 18 public signals (Phase 6)');
 
-    if (publicSignals.length !== 17) {
-      console.warn(`⚠️  Warning: Expected 17 signals, got ${publicSignals.length}`);
+    if (publicSignals.length !== 18) {
+      console.warn(`⚠️  Warning: Expected 18 signals, got ${publicSignals.length}`);
     }
 
     const calldata = await snarkjs.plonk.exportSolidityCallData(

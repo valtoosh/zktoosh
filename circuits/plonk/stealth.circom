@@ -2,6 +2,8 @@ pragma circom 2.1.8;
 
 include "circomlib/circuits/poseidon.circom";
 include "circomlib/circuits/comparators.circom";
+include "circomlib/circuits/escalarmulany.circom";
+include "circomlib/circuits/bitify.circom";
 
 /*
  * Phase 6B: Monero-Style Stealth Address System
@@ -26,38 +28,48 @@ include "circomlib/circuits/comparators.circom";
  * Creates a one-time address that only the recipient can detect and claim
  */
 template StealthAddressGeneration() {
-    signal input recipientViewPublicKey;  // Recipient's published view public key
-    signal input ephemeralPrivateKey;     // Sender's one-time private key
-    signal input transferAmount;          // Transfer amount (included in derivation)
-    signal input stealthSalt;             // Random salt for uniqueness
+    signal input recipientViewPublicKey[2];  // Recipient's published view public key (Point X, Y)
+    signal input ephemeralPrivateKey;        // Sender's one-time private key
+    signal input transferAmount;             // Transfer amount (included in derivation)
+    signal input stealthSalt;                // Random salt for uniqueness
 
-    signal output stealthAddress;         // One-time stealth address
-    signal output ephemeralPublicKey;     // Public key for recipient scanning
-    signal output sharedSecret;           // For encrypted memo generation (optional output)
+    signal output stealthAddress;            // One-time stealth address
+    signal output ephemeralPublicKey[2];     // Public key for recipient scanning (Point X, Y)
+    signal output sharedSecret;              // For encrypted memo generation (optional output)
+
+    // Convert ephemeral private key (scalar) to bit array for EscalarMulAny
+    component ephemPrivBits = Num2Bits(254);
+    ephemPrivBits.in <== ephemeralPrivateKey;
 
     // Step 1: Derive ephemeral public key
-    // In real ECC, this would be ephemeralPrivateKey * G
-    // We simulate with Poseidon hash
-    component ephemPubGen = Poseidon(1);
-    ephemPubGen.inputs[0] <== ephemeralPrivateKey;
-    ephemeralPublicKey <== ephemPubGen.out;
+    // ephemeralPubKey = ephemeralPrivKey * G (base point)
+    // BabyJubJub Base8 Generator Point (Matches circomlibjs)
+    // X: 5299619240641551281634865583518297030282874472190772894086521144482721001553
+    // Y: 16950150798460657717958625567821834550301663161624707787222815936182638968203
+    component ephemPubGen = EscalarMulAny(254);
+    for (var i = 0; i < 254; i++) {
+        ephemPubGen.e[i] <== ephemPrivBits.out[i];
+    }
+    ephemPubGen.p[0] <== 5299619240641551281634865583518297030282874472190772894086521144482721001553;
+    ephemPubGen.p[1] <== 16950150798460657717958625567821834550301663161624707787222815936182638968203;
 
-    // Step 2: Derive shared secret (Diffie-Hellman-style)
-    // In real ECC: sharedSecret = ephemeralPrivateKey * recipientViewPublicKey
-    // For hash-based DH, we use: Poseidon(recipientViewPub, ephemeralPub)
-    // This matches the claim-side formula: Poseidon(viewPriv, ephemeralPub)
-    // where recipientViewPub = Poseidon(viewPriv)
-    component secretGen = Poseidon(2);
-    secretGen.inputs[0] <== recipientViewPublicKey;
-    secretGen.inputs[1] <== ephemeralPublicKey;
-    sharedSecret <== secretGen.out;
+    ephemeralPublicKey[0] <== ephemPubGen.out[0];
+    ephemeralPublicKey[1] <== ephemPubGen.out[1];
+
+    // Step 2: Derive shared secret (ECDH)
+    // sharedSecret = ephemeralPrivateKey * recipientViewPublicKey
+    component secretGen = EscalarMulAny(254);
+    for (var i = 0; i < 254; i++) {
+        secretGen.e[i] <== ephemPrivBits.out[i];
+    }
+    secretGen.p[0] <== recipientViewPublicKey[0];
+    secretGen.p[1] <== recipientViewPublicKey[1];
+
+    // Use X-coordinate as the shared secret for hashing
+    sharedSecret <== secretGen.out[0];
 
     // Step 3: Generate stealth address
     // stealthAddress = Hash(sharedSecret, transferAmount, stealthSalt)
-    // This ensures:
-    // - Only recipient with viewPrivateKey can recompute sharedSecret
-    // - Amount is bound to stealth address (prevents amount manipulation)
-    // - Salt provides uniqueness (same recipient, same amount = different address)
     component stealthGen = Poseidon(3);
     stealthGen.inputs[0] <== sharedSecret;
     stealthGen.inputs[1] <== transferAmount;
@@ -70,22 +82,30 @@ template StealthAddressGeneration() {
  * Recipient proves they can compute the stealth address using their view key
  */
 template StealthAddressOwnership() {
-    signal input viewPrivateKey;          // Claimant's view private key (private)
-    signal input ephemeralPublicKey;      // Ephemeral key from blockchain (public/private)
-    signal input transferAmount;          // Transfer amount (discovered during scanning)
-    signal input stealthSalt;             // Salt from transfer (discovered during scanning)
-    signal input stealthAddress;          // Stealth address to prove ownership of (public)
+    signal input viewPrivateKey;             // Claimant's view private key (private)
+    signal input ephemeralPublicKey[2];      // Ephemeral key from blockchain (public/private Point X, Y)
+    signal input transferAmount;             // Transfer amount (discovered during scanning)
+    signal input stealthSalt;                // Salt from transfer (discovered during scanning)
+    signal input stealthAddress;             // Stealth address to prove ownership of (public)
 
-    signal output isOwner;                // 1 if claimant owns stealth address
+    signal output isOwner;                   // 1 if claimant owns stealth address
+
+    // Convert view private key (scalar) to bit array for EscalarMulAny
+    component viewPrivBits = Num2Bits(254);
+    viewPrivBits.in <== viewPrivateKey;
 
     // Step 1: Recompute shared secret using view private key
-    component secretGen = Poseidon(2);
-    secretGen.inputs[0] <== viewPrivateKey;
-    secretGen.inputs[1] <== ephemeralPublicKey;
+    // sharedSecret = viewPrivateKey * ephemeralPublicKey
+    component secretGen = EscalarMulAny(254);
+    for (var i = 0; i < 254; i++) {
+        secretGen.e[i] <== viewPrivBits.out[i];
+    }
+    secretGen.p[0] <== ephemeralPublicKey[0];
+    secretGen.p[1] <== ephemeralPublicKey[1];
 
     // Step 2: Recompute stealth address
     component stealthGen = Poseidon(3);
-    stealthGen.inputs[0] <== secretGen.out;
+    stealthGen.inputs[0] <== secretGen.out[0]; // Use X coordinate
     stealthGen.inputs[1] <== transferAmount;
     stealthGen.inputs[2] <== stealthSalt;
 
@@ -98,34 +118,15 @@ template StealthAddressOwnership() {
 }
 
 /**
- * Stealth Payment Detection
- * Recipient scans blockchain to detect incoming payments
- * This template helps generate the detection keys
- */
-template StealthScanningKey() {
-    signal input recipientAddress;        // Recipient's address
-    signal input ephemeralPublicKey;      // From blockchain event
-
-    signal output scanningKey;            // Key to match against stealth addresses
-
-    // Generate scanning key
-    component scanner = Poseidon(2);
-    scanner.inputs[0] <== recipientAddress;
-    scanner.inputs[1] <== ephemeralPublicKey;
-
-    scanningKey <== scanner.out;
-}
-
-/**
  * Batch Stealth Detection (Monero-Style)
  * Check multiple stealth addresses at once (for efficient blockchain scanning)
  */
 template BatchStealthDetection(numAddresses) {
-    signal input viewPrivateKey;                    // Recipient's view private key
-    signal input ephemeralPublicKeys[numAddresses]; // From blockchain events
-    signal input transferAmounts[numAddresses];     // Discovered amounts (from encrypted memos)
-    signal input stealthSalts[numAddresses];        // Discovered salts (from encrypted memos)
-    signal input stealthAddresses[numAddresses];    // Stealth addresses from blockchain
+    signal input viewPrivateKey;                       // Recipient's view private key
+    signal input ephemeralPublicKeys[numAddresses][2]; // From blockchain events (Points X, Y)
+    signal input transferAmounts[numAddresses];        // Discovered amounts (from encrypted memos)
+    signal input stealthSalts[numAddresses];           // Discovered salts (from encrypted memos)
+    signal input stealthAddresses[numAddresses];       // Stealth addresses from blockchain
 
     signal output matches[numAddresses];  // 1 if each address is owned by recipient
 
@@ -134,7 +135,8 @@ template BatchStealthDetection(numAddresses) {
     for (var i = 0; i < numAddresses; i++) {
         detectors[i] = StealthAddressOwnership();
         detectors[i].viewPrivateKey <== viewPrivateKey;
-        detectors[i].ephemeralPublicKey <== ephemeralPublicKeys[i];
+        detectors[i].ephemeralPublicKey[0] <== ephemeralPublicKeys[i][0];
+        detectors[i].ephemeralPublicKey[1] <== ephemeralPublicKeys[i][1];
         detectors[i].transferAmount <== transferAmounts[i];
         detectors[i].stealthSalt <== stealthSalts[i];
         detectors[i].stealthAddress <== stealthAddresses[i];

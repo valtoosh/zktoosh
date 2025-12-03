@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import "./Poseidon.sol";
 
 interface IPlonkVerifierPhase6 {
-    function verifyProof(uint256[24] calldata proof, uint256[17] calldata pubSignals) external view returns (bool);
+    function verifyProof(uint256[24] calldata proof, uint256[18] calldata pubSignals) external view returns (bool);
 }
 
 interface IClaimVerifier {
@@ -29,7 +29,7 @@ contract PrivateTransferV4 {
 
     struct StealthPayment {
         uint256 stealthAddress;       // One-time address for recipient
-        uint256 ephemeralPublicKey;   // For recipient scanning
+        uint256[2] ephemeralPublicKey;   // For recipient scanning (Point X, Y)
         uint256 encryptedAmount;      // Encrypted transfer amount
         uint256 timestamp;
         bytes32 encryptedMemo;        // Phase 6E: Optional encrypted memo
@@ -87,7 +87,7 @@ contract PrivateTransferV4 {
         address indexed sender,
         uint256 indexed nullifier,
         uint256 indexed stealthAddress,
-        uint256 ephemeralPublicKey,
+        uint256[2] ephemeralPublicKey,
         bytes32 encryptedMemo,
         uint256 timestamp,
         bool valid
@@ -95,7 +95,7 @@ contract PrivateTransferV4 {
 
     event StealthPaymentCreated(
         uint256 indexed stealthAddress,
-        uint256 ephemeralPublicKey,
+        uint256[2] ephemeralPublicKey,
         bytes32 encryptedMemo,
         uint256 timestamp
     );
@@ -178,42 +178,46 @@ contract PrivateTransferV4 {
     /**
      * @notice Execute private transfer with Phase 6 unified proof
      * @param proof PLONK proof (24 uint256 elements)
-     * @param publicSignals Public signals (17 elements)
+     * @param publicSignals Public signals (18 elements - ECDH updated)
      * @param encryptedMemo Optional encrypted memo for auditability
      *
-     * Public Signals Order (17 total):
-     * Outputs (0-10):
+     * Public Signals Order (18 total):
+     * Outputs (0-11):
      * [0] valid, [1] newBalance, [2] newBalanceCommitment, [3] recipientHash,
-     * [4] nullifier, [5] sctNew, [6] stealthAddress, [7] ephemeralPublicKey,
-     * [8] merkleLeaf, [9] merkleProofValid, [10] encryptedMemoHash
+     * [4] nullifier, [5] sctNew, [6] stealthAddress, [7] ephemeralPublicKey[0], [8] ephemeralPublicKey[1],
+     * [9] merkleLeaf, [10] merkleProofValid, [11] encryptedMemoHash
      *
-     * Inputs (11-16):
-     * [11] assetId, [12] maxAmount, [13] balanceCommitment, [14] sctOld,
-     * [15] vPubDelta, [16] merkleRoot
+     * Inputs (12-17):
+     * [12] assetId, [13] maxAmount, [14] balanceCommitment, [15] sctOld,
+     * [16] vPubDelta, [17] merkleRoot
      */
     function privateTransfer(
         uint256[24] calldata proof,
-        uint256[17] calldata publicSignals,
+        uint256[18] calldata publicSignals,
         bytes32 encryptedMemo
     ) external payable whenNotPaused {
         // Parse public signals
         uint256 valid = publicSignals[0];
-        uint256 newBalance = publicSignals[1];
-        uint256 newBalanceCommitment = publicSignals[2];
+        // uint256 newBalance = publicSignals[1]; // Unused local variable
+        // uint256 newBalanceCommitment = publicSignals[2]; // Unused local variable
         uint256 recipientHash = publicSignals[3];
         uint256 nullifier = publicSignals[4];
         uint256 sctNew = publicSignals[5];
         uint256 stealthAddress = publicSignals[6];         // Phase 6B
-        uint256 ephemeralPublicKey = publicSignals[7];     // Phase 6B
-        uint256 merkleLeaf = publicSignals[8];             // Phase 6C
-        uint256 merkleProofValid = publicSignals[9];       // Phase 6C
-        uint256 encryptedMemoHash = publicSignals[10];     // Phase 6E
-        uint256 assetId = publicSignals[11];
-        uint256 maxAmount = publicSignals[12];
-        uint256 balanceCommitment = publicSignals[13];
-        uint256 sctOld = publicSignals[14];
-        uint256 vPubDelta = publicSignals[15];
-        uint256 inputMerkleRoot = publicSignals[16];       // Phase 6C
+        
+        uint256[2] memory ephemeralPublicKey;
+        ephemeralPublicKey[0] = publicSignals[7];          // Phase 6B (X)
+        ephemeralPublicKey[1] = publicSignals[8];          // Phase 6B (Y)
+        
+        uint256 merkleLeaf = publicSignals[9];             // Phase 6C
+        uint256 merkleProofValid = publicSignals[10];      // Phase 6C
+        // uint256 encryptedMemoHash = publicSignals[11];  // Phase 6E - Unused local variable
+        uint256 assetId = publicSignals[12];
+        // uint256 maxAmount = publicSignals[13]; // Unused local variable
+        // uint256 balanceCommitment = publicSignals[14]; // Unused local variable
+        // uint256 sctOld = publicSignals[15]; // Unused local variable
+        uint256 vPubDelta = publicSignals[16];
+        uint256 inputMerkleRoot = publicSignals[17];       // Phase 6C
 
         // Validate asset
         require(whitelistedAssets[assetId], "Asset not whitelisted");
@@ -345,8 +349,7 @@ contract PrivateTransferV4 {
      */
     function _computeMerkleRoot() private view returns (uint256) {
         if (merkleTree.size == 0) return 0;
-        if (merkleTree.size == 1) return merkleLeaves[0];
-
+        
         // Build tree bottom-up (simplified)
         uint256 treeSize = merkleTree.size;
         uint256[] memory currentLevel = new uint256[](treeSize);
@@ -397,7 +400,7 @@ contract PrivateTransferV4 {
         uint256 valid = publicSignals[0];           // Circuit output
         uint256 claimerAddress = publicSignals[1];  // Circuit output (claimerAddressHash)
         uint256 transferAmount = publicSignals[2];  // Circuit output (claimedAmount)
-        uint256 assetId = publicSignals[3];         // Circuit public input
+        // uint256 assetId = publicSignals[3];      // Circuit public input (unused local)
         uint256 stealthAddress = publicSignals[4];  // Circuit public input
 
         StealthPayment storage payment = stealthPayments[stealthAddress];
@@ -433,7 +436,7 @@ contract PrivateTransferV4 {
      */
     function getStealthPayment(uint256 index) external view returns (
         uint256 stealthAddr,
-        uint256 ephemeralPubKey,
+        uint256[2] memory ephemeralPubKey,
         bytes32 memo,
         uint256 timestamp,
         bool claimed

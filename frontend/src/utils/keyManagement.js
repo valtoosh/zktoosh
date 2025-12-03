@@ -1,52 +1,71 @@
 // frontend/src/utils/keyManagement.js
 /* eslint-disable no-undef */
-import { buildPoseidon } from 'circomlibjs';
+import { buildBabyjub, buildEddsa, buildPoseidon } from 'circomlibjs';
 
 /**
- * Monero-Style Key Management for zkUlt
+ * Monero-Style Key Management for zkUlt (ECDH Upgrade)
  *
- * Manages view and spend key pairs with localStorage + basic encryption
+ * Manages view and spend key pairs with localStorage
  */
 
 const FIELD_MODULUS = BigInt('21888242871839275222246405745257275088548364400416034343698204186575808495617');
+const BABYJUB_SUB_ORDER = BigInt('2736030358979909402780800718157159386076813972158567259200215660948447373041');
 const STORAGE_KEY_VIEW_PRIV = 'zkult_view_private_key';
 const STORAGE_KEY_SPEND_PRIV = 'zkult_spend_private_key';
 const STORAGE_KEY_VIEW_PUB = 'zkult_view_public_key';
 
+let babyJub = null;
+let eddsa = null;
 let poseidon = null;
 
 /**
- * Initialize Poseidon hasher
+ * Initialize Crypto Primitives
  */
-async function initPoseidon() {
-  if (!poseidon) {
+async function initCrypto() {
+  if (!babyJub || !eddsa || !poseidon) {
+    babyJub = await buildBabyjub();
+    eddsa = await buildEddsa();
     poseidon = await buildPoseidon();
   }
-  return poseidon;
+  return { babyJub, eddsa, poseidon, F: babyJub.F };
 }
 
 /**
- * Generate a random field element
+ * Generate a random scalar (private key)
  */
-function generateRandomFieldElement() {
+function generateRandomScalar() {
   const randomBytes = new Uint8Array(32);
   crypto.getRandomValues(randomBytes);
-
-  let randomBigInt = BigInt(0);
-  for (let i = 0; i < 32; i++) {
-    randomBigInt = (randomBigInt << BigInt(8)) | BigInt(randomBytes[i]);
-  }
-
-  return (randomBigInt % FIELD_MODULUS).toString();
+  return randomBytes; // Return bytes, easier for eddsa
 }
 
 /**
- * Derive view public key from view private key
+ * Derive view public key point [X, Y] from private key scalar
+ * CRITICAL: Uses raw BabyJubJub scalar multiplication (NOT EdDSA) to match circuit
  */
-async function deriveViewPublicKey(viewPrivateKey) {
-  const p = await initPoseidon();
-  const hash = p([BigInt(viewPrivateKey)]);
-  return p.F.toString(hash);
+async function deriveViewPublicKey(viewPrivateKeyBytes) {
+  const { babyJub, F } = await initCrypto();
+
+  // Convert bytes to scalar (mod BABYJUB_SUB_ORDER)
+  let privKeyScalar = BigInt(0);
+  for (let i = 0; i < 32; i++) {
+    privKeyScalar = (privKeyScalar << BigInt(8)) | BigInt(viewPrivateKeyBytes[i]);
+  }
+  privKeyScalar = privKeyScalar % BABYJUB_SUB_ORDER;
+
+  // BabyJubJub base point (same as in circuits)
+  // Must use babyJub.Base8 which is already in the correct field element format
+  const basePoint = babyJub.Base8;
+
+  // Raw scalar multiplication: pubKey = privKey × basePoint
+  // This matches EscalarMulAny in claim.circom and stealth.circom
+  const pubKeyPoint = babyJub.mulPointEscalar(basePoint, privKeyScalar);
+
+  // Convert to string array for storage/display
+  return [
+    F.toString(pubKeyPoint[0]),
+    F.toString(pubKeyPoint[1])
+  ];
 }
 
 /**
@@ -55,43 +74,51 @@ async function deriveViewPublicKey(viewPrivateKey) {
  * @returns {Object} { viewPrivateKey, viewPublicKey, spendPrivateKey }
  */
 export async function generateKeyPair() {
-  console.log('🔑 Generating Monero-style key pair...');
+  console.log('🔑 Generating Monero-style key pair (ECDH)...');
 
-  const viewPrivateKey = generateRandomFieldElement();
-  const spendPrivateKey = generateRandomFieldElement();
-  const viewPublicKey = await deriveViewPublicKey(viewPrivateKey);
+  const { F } = await initCrypto();
+
+  // View Key
+  const viewPrivBytes = generateRandomScalar();
+  const viewPublicKey = await deriveViewPublicKey(viewPrivBytes);
+  
+  // Spend Key (Scalar)
+  const spendPrivBytes = generateRandomScalar();
+  
+  // Convert bytes to BigInt -> String for storage
+  // CRITICAL FIX: Use BabyJubJub Subgroup Order for private keys
+  // This ensures 0 <= scalar < order, preventing mismatch between JS and Circuit
+  let viewPrivBigInt = BigInt(0);
+  for (let i = 0; i < 32; i++) {
+    viewPrivBigInt = (viewPrivBigInt << BigInt(8)) | BigInt(viewPrivBytes[i]);
+  }
+  const viewPrivateKey = (viewPrivBigInt % BABYJUB_SUB_ORDER).toString();
+
+  let spendPrivBigInt = BigInt(0);
+  for (let i = 0; i < 32; i++) {
+    spendPrivBigInt = (spendPrivBigInt << BigInt(8)) | BigInt(spendPrivBytes[i]);
+  }
+  const spendPrivateKey = (spendPrivBigInt % BABYJUB_SUB_ORDER).toString();
 
   console.log('✅ Key pair generated');
-  console.log('   View Public Key:', viewPublicKey.slice(0, 20) + '...');
+  console.log('   View Public Key:', viewPublicKey);
 
   return {
     viewPrivateKey,
-    viewPublicKey,
+    viewPublicKey, // [X, Y] array of strings
     spendPrivateKey
   };
 }
 
 /**
- * Save keys to localStorage (with basic obfuscation)
- * Note: This is basic security. For production, consider more robust encryption.
+ * Save keys to localStorage (Plain text for reliability)
  */
 export function saveKeys(viewPrivateKey, spendPrivateKey, viewPublicKey) {
   try {
-    // Simple XOR obfuscation (not cryptographically secure, but better than plaintext)
-    const obfuscate = (key) => {
-      const entropy = window.location.hostname + navigator.userAgent;
-      let result = '';
-      for (let i = 0; i < key.length; i++) {
-        result += String.fromCharCode(
-          key.charCodeAt(i) ^ entropy.charCodeAt(i % entropy.length)
-        );
-      }
-      return btoa(result);
-    };
-
-    localStorage.setItem(STORAGE_KEY_VIEW_PRIV, obfuscate(viewPrivateKey));
-    localStorage.setItem(STORAGE_KEY_SPEND_PRIV, obfuscate(spendPrivateKey));
-    localStorage.setItem(STORAGE_KEY_VIEW_PUB, viewPublicKey); // Public key doesn't need obfuscation
+    localStorage.setItem(STORAGE_KEY_VIEW_PRIV, viewPrivateKey);
+    localStorage.setItem(STORAGE_KEY_SPEND_PRIV, spendPrivateKey);
+    // Store Public Key as JSON string since it's an array
+    localStorage.setItem(STORAGE_KEY_VIEW_PUB, JSON.stringify(viewPublicKey));
 
     console.log('✅ Keys saved to localStorage');
     return true;
@@ -106,29 +133,31 @@ export function saveKeys(viewPrivateKey, spendPrivateKey, viewPublicKey) {
  */
 export function loadKeys() {
   try {
-    const deobfuscate = (encoded) => {
-      const entropy = window.location.hostname + navigator.userAgent;
-      const obfuscated = atob(encoded);
-      let result = '';
-      for (let i = 0; i < obfuscated.length; i++) {
-        result += String.fromCharCode(
-          obfuscated.charCodeAt(i) ^ entropy.charCodeAt(i % entropy.length)
-        );
+    const viewPrivateKey = localStorage.getItem(STORAGE_KEY_VIEW_PRIV);
+    const spendPrivateKey = localStorage.getItem(STORAGE_KEY_SPEND_PRIV);
+    const viewPubString = localStorage.getItem(STORAGE_KEY_VIEW_PUB);
+
+    if (!viewPrivateKey || !spendPrivateKey || !viewPubString) {
+      return null;
+    }
+
+    // Handle legacy keys (single string) vs new keys (JSON array)
+    let viewPublicKey;
+    try {
+      viewPublicKey = JSON.parse(viewPubString);
+      // If it's not an array (legacy key), treat it as null/invalid to force regeneration
+      if (!Array.isArray(viewPublicKey)) {
+          console.warn("Legacy key detected, clearing...");
+          return null;
       }
-      return result;
-    };
-
-    const viewPrivEncoded = localStorage.getItem(STORAGE_KEY_VIEW_PRIV);
-    const spendPrivEncoded = localStorage.getItem(STORAGE_KEY_SPEND_PRIV);
-    const viewPublicKey = localStorage.getItem(STORAGE_KEY_VIEW_PUB);
-
-    if (!viewPrivEncoded || !spendPrivEncoded || !viewPublicKey) {
+    } catch (e) {
+      console.warn("Legacy key format detected, clearing...");
       return null;
     }
 
     return {
-      viewPrivateKey: deobfuscate(viewPrivEncoded),
-      spendPrivateKey: deobfuscate(spendPrivEncoded),
+      viewPrivateKey: viewPrivateKey,
+      spendPrivateKey: spendPrivateKey,
       viewPublicKey: viewPublicKey
     };
   } catch (error) {
@@ -155,81 +184,43 @@ export function clearKeys() {
 }
 
 /**
- * Export keys as JSON (for backup)
- */
-export function exportKeys() {
-  const keys = loadKeys();
-  if (!keys) return null;
-
-  return JSON.stringify(keys, null, 2);
-}
-
-/**
- * Import keys from JSON backup
- */
-export function importKeys(jsonString) {
-  try {
-    const keys = JSON.parse(jsonString);
-
-    if (!keys.viewPrivateKey || !keys.spendPrivateKey || !keys.viewPublicKey) {
-      throw new Error('Invalid key format');
-    }
-
-    saveKeys(keys.viewPrivateKey, keys.spendPrivateKey, keys.viewPublicKey);
-    console.log('✅ Keys imported successfully');
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to import keys:', error);
-    return false;
-  }
-}
-
-/**
- * Derive shared secret (for payment detection)
+ * Derive shared secret (ECDH)
+ * sharedSecret = viewPrivateKey * ephemeralPublicKeyPoint
  */
 export async function deriveSharedSecret(viewPrivateKey, ephemeralPublicKey) {
-  const p = await initPoseidon();
-  // First derive view public key from private key
-  const viewPub = p([BigInt(viewPrivateKey)]);
-  const viewPubStr = p.F.toString(viewPub);
-  // Then derive shared secret: Poseidon(viewPub, ephemeralPub)
-  const hash = p([BigInt(viewPubStr), BigInt(ephemeralPublicKey)]);
-  return p.F.toString(hash);
+  const { babyJub, F } = await initCrypto();
+  
+  // Convert inputs to correct types
+  const privKey = BigInt(viewPrivateKey);
+  
+  // Verify ephemeral key is a point
+  let ephPoint;
+  if (Array.isArray(ephemeralPublicKey)) {
+      ephPoint = [BigInt(ephemeralPublicKey[0]), BigInt(ephemeralPublicKey[1])];
+  } else {
+      throw new Error("Ephemeral public key must be [x, y] array");
+  }
+
+  // Perform Scalar Multiplication (ECDH)
+  // sharedPoint = privKey * ephPoint
+  const sharedPoint = babyJub.mulPointEscalar(ephPoint, privKey);
+  
+  // Use X-coordinate as shared secret
+  return F.toString(sharedPoint[0]);
 }
 
 /**
  * Compute stealth address
+ * stealthAddress = Poseidon(sharedSecret, amount, salt)
  */
 export async function computeStealthAddress(sharedSecret, transferAmount, stealthSalt) {
-  const p = await initPoseidon();
-  const hash = p([
+  const { poseidon, F } = await initCrypto();
+  const hash = poseidon([
     BigInt(sharedSecret),
     BigInt(transferAmount),
     BigInt(stealthSalt)
   ]);
-  return p.F.toString(hash);
-}
-
-/**
- * Check if a payment belongs to the user
- */
-export async function checkPaymentOwnership(viewPrivateKey, ephemeralPublicKey, stealthAddress, transferAmount, stealthSalt) {
-  try {
-    const sharedSecret = await deriveSharedSecret(viewPrivateKey, ephemeralPublicKey);
-    const computed = await computeStealthAddress(sharedSecret, transferAmount, stealthSalt);
-    return computed === stealthAddress;
-  } catch (error) {
-    console.error('❌ Ownership check failed:', error);
-    return false;
-  }
-}
-
-/**
- * Format key for display (show first 10 and last 10 chars)
- */
-export function formatKeyForDisplay(key) {
-  if (!key || key.length < 20) return key;
-  return `${key.slice(0, 10)}...${key.slice(-10)}`;
+  return F.toString(hash);
 }
 
 export default {
@@ -238,10 +229,6 @@ export default {
   loadKeys,
   hasKeys,
   clearKeys,
-  exportKeys,
-  importKeys,
   deriveSharedSecret,
-  computeStealthAddress,
-  checkPaymentOwnership,
-  formatKeyForDisplay
+  computeStealthAddress
 };

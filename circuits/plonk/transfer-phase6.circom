@@ -8,36 +8,35 @@ include "./stealth.circom";
 include "./range_proof.circom";
 
 /*
- * zkUlt Phase 6 Unified Privacy Circuit
+ * zkUlt Phase 6 Unified Privacy Circuit (ECDH Fixed)
  *
- * Combines:
- * - Phase 5B: Dual Account Model (EOA + ENA) with symmetric encryption
- * - Phase 6B: Stealth Addresses for recipient privacy
- * - Phase 6C: Merkle Tree for anonymity sets
- * - Phase 6D: Range Proofs to prevent inference attacks
- * - Phase 6E: Encrypted memos (handled off-chain, memo hash on-chain)
+ * Security Upgrade:
+ * - Uses BabyJubJub ECDH for shared secret derivation
+ * - Public keys are now Points (X, Y) instead of Scalars
+ * - Prevents linkability attacks
  *
- * Public Signals Order (16 total):
- * Outputs (0-10):
- * [0] valid - transfer validation result
- * [1] newBalance - sender's ENA balance after transfer
- * [2] newBalanceCommitment - commitment to new balance
- * [3] recipientHash - backward compatible recipient hash
- * [4] nullifier - prevents double-spending
- * [5] sctNew - encrypted new ENA balance
- * [6] stealthAddress - one-time recipient address (Phase 6B)
- * [7] ephemeralPublicKey - for recipient scanning (Phase 6B)
- * [8] merkleLeaf - leaf to insert in Merkle tree (Phase 6C)
- * [9] merkleProofValid - Merkle proof validation (Phase 6C)
- * [10] encryptedMemoHash - hash of encrypted memo (Phase 6E)
+ * Public Signals Order (18 total):
+ * Outputs (0-11):
+ * [0] valid
+ * [1] newBalance
+ * [2] newBalanceCommitment
+ * [3] recipientHash
+ * [4] nullifier
+ * [5] sctNew
+ * [6] stealthAddress
+ * [7] ephemeralPublicKey[0] (X)
+ * [8] ephemeralPublicKey[1] (Y)
+ * [9] merkleLeaf
+ * [10] merkleProofValid
+ * [11] encryptedMemoHash
  *
- * Public Inputs (11-15):
- * [11] assetId - asset identifier
- * [12] maxAmount - maximum allowed amount
- * [13] balanceCommitment - commitment to sender's balance
- * [14] sctOld - encrypted old ENA balance
- * [15] vPubDelta - net public transfer (deposit/withdraw)
- * [16] merkleRoot - current Merkle tree root (Phase 6C)
+ * Public Inputs (12-17):
+ * [12] assetId
+ * [13] maxAmount
+ * [14] balanceCommitment
+ * [15] sctOld
+ * [16] vPubDelta
+ * [17] merkleRoot
  */
 
 template PlonkTransferPhase6() {
@@ -48,7 +47,7 @@ template PlonkTransferPhase6() {
     // Phase 5B: Existing private inputs
     signal input senderBalance;              // Sender's current ENA balance
     signal input transferAmount;             // Amount to transfer
-    signal input recipientViewPublicKey;     // Recipient's VIEW public key (Monero-style)
+    signal input recipientViewPublicKey[2];  // Recipient's VIEW public key (Point X, Y)
     signal input salt;                       // For commitment randomness
     signal input kENA;                       // Symmetric key for ENA encryption
     signal input vPubIn;                     // Public deposit (EOA → ENA)
@@ -85,7 +84,7 @@ template PlonkTransferPhase6() {
     signal output nullifier;
     signal output sctNew;
     signal output stealthAddress;            // Phase 6B
-    signal output ephemeralPublicKey;        // Phase 6B
+    signal output ephemeralPublicKey[2];     // Phase 6B (Point X, Y)
     signal output merkleLeaf;                // Phase 6C
     signal output merkleProofValid;          // Phase 6C
     signal output encryptedMemoHash;         // Phase 6E
@@ -138,25 +137,27 @@ template PlonkTransferPhase6() {
     rangeValid <== rangeProof.isValid;
 
     // ============================================
-    // PHASE 6B: MONERO-STYLE STEALTH ADDRESS GENERATION
+    // PHASE 6B: MONERO-STYLE STEALTH ADDRESS GENERATION (ECDH)
     // ============================================
     component stealthGen = StealthAddressGeneration();
-    stealthGen.recipientViewPublicKey <== recipientViewPublicKey;
+    stealthGen.recipientViewPublicKey[0] <== recipientViewPublicKey[0];
+    stealthGen.recipientViewPublicKey[1] <== recipientViewPublicKey[1];
     stealthGen.ephemeralPrivateKey <== ephemeralPrivateKey;
     stealthGen.transferAmount <== transferAmount;
     stealthGen.stealthSalt <== stealthSalt;
 
     stealthAddress <== stealthGen.stealthAddress;
-    ephemeralPublicKey <== stealthGen.ephemeralPublicKey;
+    ephemeralPublicKey[0] <== stealthGen.ephemeralPublicKey[0];
+    ephemeralPublicKey[1] <== stealthGen.ephemeralPublicKey[1];
 
     // ============================================
     // RECIPIENT HASH (For backward compatibility and merkle leaf)
-    // Note: In Monero-style, this is less meaningful since sender doesn't know recipient
-    // We use viewPublicKey here for merkle tree consistency
+    // Uses Poseidon(pkX, pkY, amount) to match Claim circuit
     // ============================================
-    component recipientHasher = Poseidon(2);
-    recipientHasher.inputs[0] <== recipientViewPublicKey;
-    recipientHasher.inputs[1] <== transferAmount;
+    component recipientHasher = Poseidon(3);
+    recipientHasher.inputs[0] <== recipientViewPublicKey[0];
+    recipientHasher.inputs[1] <== recipientViewPublicKey[1];
+    recipientHasher.inputs[2] <== transferAmount;
     recipientHash <== recipientHasher.out;
 
     // ============================================
@@ -169,44 +170,37 @@ template PlonkTransferPhase6() {
     nullifier <== nullifierHasher.out;
 
     // ============================================
-    // PHASE 6C: MERKLE TREE INTEGRATION
-    // Compute Merkle leaf and verify it's part of the tree
+    // PHASE 6C: MERKLE TREE INTEGRATION (STATE TREE LOGIC)
     // ============================================
 
-    // Compute current timestamp (approximation: use balanceCommitment as proxy)
-    signal timestamp;
-    timestamp <== balanceCommitment;  // In real impl, would use block.timestamp
+    // Note: Removed legacy transaction hash logic. Tree now stores State Commitments.
 
-    // Compute Merkle leaf
-    component leafHasher = MerkleLeafHash();
-    leafHasher.recipientHash <== recipientHash;
-    leafHasher.transferAmount <== transferAmount;
-    leafHasher.timestamp <== timestamp;
-    merkleLeaf <== leafHasher.leafHash;
-
-    // Verify Merkle proof (optional - can be disabled for initial transfers)
-    // For new transfers, merkleRoot might be 0
+    // Verify Merkle proof for the OLD commitment (balanceCommitment)
     component merkleProof = MerkleTreeInclusionProof(20);
-    merkleProof.leaf <== merkleLeaf;
+    merkleProof.leaf <== balanceCommitment; // Prove OLD state exists
     merkleProof.root <== merkleRoot;
     for (var i = 0; i < 20; i++) {
         merkleProof.pathElements[i] <== merklePathElements[i];
         merkleProof.pathIndices[i] <== merklePathIndices[i];
     }
 
-    // For Phase 6C initial deployment: allow merkleRoot = 0 (no verification needed)
+    // CRITICAL FIX: Allow skipping Merkle proof if this is a new account (senderBalance == 0)
+    // OR if the tree is empty (merkleRoot == 0).
+    component isNewAccount = IsZero();
+    isNewAccount.in <== senderBalance;
+
     component rootIsZero = IsZero();
     rootIsZero.in <== merkleRoot;
 
-    // merkleProofValid = 1 if either root is 0 OR proof is valid
-    signal proofOrNoRoot;
-    proofOrNoRoot <== rootIsZero.out + merkleProof.isValid;
+    component skipCheck = GreaterThan(8); 
+    skipCheck.in[0] <== isNewAccount.out + rootIsZero.out;
+    skipCheck.in[1] <== 0;
 
-    component merkleCheckGate = GreaterThan(8);
-    merkleCheckGate.in[0] <== proofOrNoRoot;
-    merkleCheckGate.in[1] <== 0;
+    component proofOrSkip = GreaterThan(8);
+    proofOrSkip.in[0] <== merkleProof.isValid + skipCheck.out;
+    proofOrSkip.in[1] <== 0;
 
-    merkleProofValid <== merkleCheckGate.out;
+    merkleProofValid <== proofOrSkip.out;
 
     // ============================================
     // PHASE 6E: ENCRYPTED MEMO HASH
@@ -242,13 +236,6 @@ template PlonkTransferPhase6() {
     assetValidation.in[0] <== assetId;
     assetValidation.in[1] <== 0;
 
-    // MONERO-STYLE: Recipient view public key validation removed
-    // View public keys are Poseidon hash outputs (field elements) - always valid
-    // No need to check recipientViewPublicKey > 0 since Poseidon guarantees non-zero outputs
-
-    // Stealth address validation removed - Poseidon hash outputs are always valid field elements
-    // No need to check if stealthAddress > 0 since Poseidon(ephemeralPublicKey, stealthSalt) guarantees valid output
-
     // ============================================
     // NEW BALANCE COMMITMENT
     // ============================================
@@ -256,6 +243,12 @@ template PlonkTransferPhase6() {
     newCommitment.inputs[0] <== newBalance;
     newCommitment.inputs[1] <== salt;
     newBalanceCommitment <== newCommitment.out;
+
+    // ----------------------------------------------------------------
+    // LATE ASSIGNMENT: MERKLE LEAF
+    // We assign merkleLeaf here because newBalanceCommitment is now ready
+    // ----------------------------------------------------------------
+    merkleLeaf <== newBalanceCommitment;
 
     // ============================================
     // COMBINE ALL CHECKS
@@ -272,8 +265,6 @@ template PlonkTransferPhase6() {
     check1 <== ltMax.out * geZero.out;
     check2 <== check1 * balanceCheck.out;
     check3 <== check2 * assetValidation.out;
-    // Removed recipientValidation.out - view public keys are always valid Poseidon outputs
-    // Removed stealthValidation.out - Poseidon outputs are always valid
     check4 <== check3 * rangeValid;                // Phase 6D
     check5 <== check4 * merkleProofValid;          // Phase 6C
     check6 <== check5;
@@ -283,10 +274,4 @@ template PlonkTransferPhase6() {
     valid <== check8;
 }
 
-// Public signals order (17 total):
-// Outputs: [0] valid, [1] newBalance, [2] newBalanceCommitment, [3] recipientHash,
-//          [4] nullifier, [5] sctNew, [6] stealthAddress, [7] ephemeralPublicKey,
-//          [8] merkleLeaf, [9] merkleProofValid, [10] encryptedMemoHash
-// Inputs:  [11] assetId, [12] maxAmount, [13] balanceCommitment, [14] sctOld,
-//          [15] vPubDelta, [16] merkleRoot
 component main {public [maxAmount, assetId, balanceCommitment, sctOld, vPubDelta, merkleRoot]} = PlonkTransferPhase6();
