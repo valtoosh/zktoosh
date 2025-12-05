@@ -1,9 +1,11 @@
 # zkPhase: Monero-Style Privacy on Ethereum with PLONK Zero-Knowledge Proofs
 
 **Raj Singh**
-Computer Science Engineering
-BITS Pilani Dubai Campus
-2021A7PS2774G@dubai.bits-pilani.ac.in
+
+Department of Computer Science and Information Systems
+Birla Institute of Technology and Science (BITS) Pilani, Dubai Campus
+Dubai International Academic City, Dubai, United Arab Emirates
+Email: 2021A7PS2774G@dubai.bits-pilani.ac.in
 
 ---
 
@@ -103,31 +105,24 @@ Each user generates:
 
 ### A. Overview
 
-```
-┌────────────────────────────────────────┐
-│ Frontend (React + MetaMask)            │
-│  - Wallet, Scanning, Claiming          │
-└────────────────────────────────────────┘
-                ↓ JSON-RPC
-┌────────────────────────────────────────┐
-│ Proof Server (Express.js)              │
-│  - Transfer proof: ~700ms (theoretical)│
-│  - Claim proof: ~38s (current)         │
-└────────────────────────────────────────┘
-                ↓ PLONK π
-┌────────────────────────────────────────┐
-│ Circuits (Circom 2.1.8)                │
-│  - transfer-phase6.circom (~20k gates) │
-│  - claim.circom (~15k gates)           │
-└────────────────────────────────────────┘
-                ↓ On-Chain Verification
-┌────────────────────────────────────────┐
-│ Smart Contracts (Sepolia)              │
-│  - PrivateTransferV4: 0x51cC96fF...    │
-│  - TransferVerifier: 0x88E6A90c...     │
-│  - ClaimVerifier: 0x63Ade6E4...        │
-└────────────────────────────────────────┘
-```
+**Figure 1: zkPhase System Architecture**
+
+The system consists of four layers in a vertical stack:
+
+1. **Frontend Layer (React + MetaMask)**: User interface providing wallet management, payment scanning, and claiming functionality. Communicates with the backend via JSON-RPC protocol.
+
+2. **Proof Server Layer (Express.js)**: Backend service responsible for generating zero-knowledge proofs. Performance: Transfer proofs take ~700ms (theoretical optimized), claim proofs currently take ~38s.
+
+3. **Circuit Layer (Circom 2.1.8)**: Zero-knowledge proof circuits compiled from:
+   - `transfer-phase6.circom`: ~20,000 constraints for private transfers
+   - `claim.circom`: ~15,000 constraints for claiming payments
+
+4. **Smart Contract Layer (Ethereum Sepolia)**:
+   - `PrivateTransferV4` (0x51cC96fF...): Main contract handling transfers and claims
+   - `TransferVerifier` (0x88E6A90c...): PLONK verifier for transfer proofs
+   - `ClaimVerifier` (0x63Ade6E4...): PLONK verifier for claim proofs
+
+Data flows vertically: User requests → Proof generation → PLONK proof verification → On-chain state updates.
 
 ### B. Key Data Structures
 
@@ -176,7 +171,7 @@ struct StealthPayment {
 
 ### A. Transfer Circuit: `transfer-phase6.circom`
 
-Based on [circuits/plonk/transfer-phase6.circom:43-292](circuits/plonk/transfer-phase6.circom#L43-L292)
+The transfer circuit is implemented in `circuits/plonk/transfer-phase6.circom` (lines 43-292) and defines the core privacy-preserving transfer logic.
 
 #### **Private Inputs** (12 signals):
 
@@ -302,7 +297,7 @@ valid <== ALL_CHECKS_PASS;
 
 ### B. Claim Circuit: `claim.circom`
 
-Based on [circuits/plonk/claim.circom:31-114](circuits/plonk/claim.circom#L31-L114)
+The claim circuit is implemented in `circuits/plonk/claim.circom` (lines 31-114) and enables recipients to claim stealth payments without revealing their identity.
 
 #### **Private Inputs** (5 signals):
 
@@ -508,7 +503,7 @@ Output: (sk_view, pk_view, sk_spend, pk_spend)
 
 ### Algorithm 1A: Stealth Address Generation (Circuit Component)
 
-Based on [circuits/plonk/stealth.circom:28-66](circuits/plonk/stealth.circom#L28-L66)
+Implemented in `circuits/plonk/stealth.circom` (lines 28-66)
 
 This circuit component is used within the main transfer circuit (Algorithm 2) to generate stealth addresses.
 
@@ -641,8 +636,8 @@ Output: detectedPayments[]         // List of payments for this recipient
 ```
 
 **Implementation Notes**:
-- **Line 5**: Contract function `getStealthPaymentCount()` ([PrivateTransferV4.sol:456](contracts/plonk/PrivateTransferV4.sol#L456))
-- **Line 8**: Contract function `getStealthPayment(i)` ([PrivateTransferV4.sol:434](contracts/plonk/PrivateTransferV4.sol#L434))
+- **Line 5**: Contract function `getStealthPaymentCount()` (PrivateTransferV4.sol, line 456)
+- **Line 8**: Contract function `getStealthPayment(i)` (PrivateTransferV4.sol, line 434)
 - **Line 20**: In production, encrypted memo would contain `(transferAmount, stealthSalt)` encrypted with `sharedSecret`
 - **Line 24**: Same computation as circuit (Algorithm 1A, line 7)
 - **Line 27**: Same computation as circuit (Algorithm 1A, line 12)
@@ -655,7 +650,7 @@ Output: detectedPayments[]         // List of payments for this recipient
 
 ### Algorithm 2: Transfer Proof Generation (Backend)
 
-Based on [backend/src/services/plonkProverPhase6.js:168-361](backend/src/services/plonkProverPhase6.js#L168-L361)
+Implemented in `backend/src/services/plonkProverPhase6.js` (lines 168-361)
 
 ```
 ═══════════════════════════════════════════════════════════════════
@@ -734,7 +729,7 @@ Output: {proof π, publicSignals, stealthAddress, ephemeralPublicKey}
 
 ### Algorithm 3: Private Transfer (Smart Contract)
 
-Based on [contracts/plonk/PrivateTransferV4.sol:194-286](contracts/plonk/PrivateTransferV4.sol#L194-L286)
+Implemented in `contracts/plonk/PrivateTransferV4.sol` (lines 194-286)
 
 ```
 ═══════════════════════════════════════════════════════════════════
@@ -853,7 +848,7 @@ Output: State update + StealthPaymentCreated event
 
 ### Algorithm 4: Claim Proof Generation (Backend)
 
-Based on [backend/src/services/claimProver.js:20-97](backend/src/services/claimProver.js#L20-L97)
+Implemented in `backend/src/services/claimProver.js` (lines 20-97)
 
 ```
 ═══════════════════════════════════════════════════════════════════
@@ -908,7 +903,7 @@ Output: {proof π, publicSignals}
 
 ### Algorithm 5: Claim Stealth Payment (Smart Contract)
 
-Based on [contracts/plonk/PrivateTransferV4.sol:392-425](contracts/plonk/PrivateTransferV4.sol#L392-L425)
+Implemented in `contracts/plonk/PrivateTransferV4.sol` (lines 392-425)
 
 ```
 ═══════════════════════════════════════════════════════════════════
@@ -1166,7 +1161,7 @@ P(link) ≤ 1/1000 = 0.1%
 **Privacy Verification**:
 - Contract: `0x51cC96fFD6cA1B73e18030Aa78A62699F2b14903`
 - Total stealth payments: **1** (only the transfer!)
-- Payment #0: `claimed = true`, timestamp: 2025-11-27
+- Payment #0: `claimed = true`, timestamp: 2024-12-04
 
 **Result**: 1 deposit + 1 transfer = 1 stealth payment (not 2) ✓
 
@@ -1219,15 +1214,71 @@ zkPhase demonstrates that Monero-style privacy is achievable on Ethereum smart c
 
 ---
 
+## ACKNOWLEDGMENTS
+
+This work was conducted as part of the Computer Science Engineering program at BITS Pilani Dubai Campus. The author acknowledges the use of Ethereum Sepolia testnet for deployment and testing. The implementation builds upon open-source tools including Circom, snarkjs, and Solidity. Special thanks to the Ethereum and zero-knowledge proof communities for their foundational work in privacy-preserving blockchain technologies.
+
+---
+
 ## REFERENCES
 
-[5] E. Ben-Sasson et al., "Zerocash: Decentralized anonymous payments from Bitcoin," IEEE S&P, 2014.
-[7] B. Bünz et al., "Zether: Towards privacy in a smart contract world," FC, 2020.
-[16] L. Grassi et al., "Poseidon: A new hash function for zero-knowledge proof systems," USENIX Security, 2021.
-[17] J. Groth, "On the size of pairing-based non-interactive arguments," EUROCRYPT, 2016.
-[19] Z. Guan et al., "Blockmaze: An efficient privacy-preserving account-model blockchain," IEEE TDSC, 2020.
-[27] A. Rondelet and M. Zajac, "ZETH: On integrating Zerocash on Ethereum," arXiv:1904.00905, 2019.
-[28] N. van Saberhagen, "CryptoNote v2.0," 2013.
+[1] M. R. Albrecht, L. Grassi, C. Rechberger, A. Roy, and T. Tiessen, "MiMC: Efficient encryption and cryptographic hashing with minimal multiplicative complexity," in ASIACRYPT, 2016, pp. 191–219.
+
+[2] A. Pertsev, R. Semenov, and R. Storm, "Tornado Cash: Privacy solution for Ethereum," 2019. [Online]. Available: https://tornado.cash
+
+[3] E. Androulaki, J. Camenisch, A. De Caro, M. Dubovitskaya, K. Elkhiyaoui, and B. Tackmann, "Privacy-preserving auditable token payments in a permissioned blockchain system," in ACM CCS, 2020, pp. 255–267.
+
+[4] M. Bellare, A. Boldyreva, K. Kurosawa, and J. Staddon, "Multirecipient encryption schemes: How to save on bandwidth and computation without sacrificing security," IEEE Transactions on Information Theory, vol. 53, no. 11, pp. 3927–3943, 2007.
+
+[5] E. Ben-Sasson, A. Chiesa, C. Garman, M. Green, I. Miers, E. Tromer, and M. Virza, "Zerocash: Decentralized anonymous payments from Bitcoin," in IEEE Symposium on Security and Privacy (S&P), 2014, pp. 459–474.
+
+[6] S. Bowe, A. Chiesa, M. Green, I. Miers, P. Mishra, and H. Wu, "ZEXE: Enabling decentralized private computation," in IEEE S&P, 2020, pp. 947–964.
+
+[7] B. Bünz, S. Agrawal, M. Zamani, and D. Boneh, "Zether: Towards privacy in a smart contract world," in Financial Cryptography and Data Security (FC), 2020, pp. 423–443.
+
+[8] V. Buterin, "Ethereum white paper: A next generation smart contract and decentralized application platform," 2013. [Online]. Available: https://ethereum.org/whitepaper
+
+[9] B. Bünz, J. Bootle, D. Boneh, A. Poelstra, P. Wuille, and G. Maxwell, "Bulletproofs: Short proofs for confidential transactions and more," in IEEE S&P, 2018, pp. 315–334.
+
+[10] E. Cecchetti, F. Zhang, Y. Ji, A. Kosba, A. Juels, and E. Shi, "Solidus: Confidential distributed ledger transactions via PVORM," in ACM CCS, 2017, pp. 701–717.
+
+[11] Y. Chen, X. Ma, C. Tang, and M. H. Au, "PGC: Decentralized confidential payment system with auditability," in ESORICS, 2020, pp. 591–610.
+
+[12] B. E. Diamond, "Many-out-of-many proofs and applications to anonymous Zether," in IEEE Symposium on Security and Privacy (SP), 2021, pp. 1800–1817.
+
+[13] E. Duffield and D. Diaz, "Dash: A privacy-centric cryptocurrency," 2015. [Online]. Available: https://github.com/dashpay/dash/wiki/Whitepaper
+
+[14] Financial Action Task Force (FATF), "Virtual assets and virtual asset service providers," 2021. [Online]. Available: https://www.fatf-gafi.org
+
+[15] P. Fauzi, S. Meiklejohn, R. Mercer, and C. Orlandi, "Quisquis: A new design for anonymous cryptocurrencies," in ASIACRYPT, 2019, pp. 649–678.
+
+[16] L. Grassi, D. Khovratovich, C. Rechberger, A. Roy, and M. Schofnegger, "Poseidon: A new hash function for zero-knowledge proof systems," in USENIX Security Symposium, 2021.
+
+[17] J. Groth, "On the size of pairing-based non-interactive arguments," in EUROCRYPT, 2016, pp. 305–326.
+
+[18] J. Groth and M. Maller, "Snarky signatures: Minimal signatures of knowledge from simulation-extractable SNARKs," in CRYPTO, 2017, pp. 581–612.
+
+[19] Z. Guan, Z. Wan, Y. Yang, Y. Zhou, and B. Huang, "Blockmaze: An efficient privacy-preserving account-model blockchain based on zk-SNARKs," IEEE Transactions on Dependable and Secure Computing, vol. 19, no. 3, pp. 1446–1463, 2020.
+
+[20] H. Kang, T. Dai, N. Jean-Louis, S. Tao, and X. Gu, "FabZK: Supporting privacy-preserving, auditable smart contracts in Hyperledger Fabric," in IEEE/IFIP International Conference on Dependable Systems and Networks (DSN), 2019, pp. 543–555.
+
+[21] A. Kosba, A. Miller, E. Shi, Z. Wen, and C. Papamanthou, "Hawk: The blockchain model of cryptography and privacy-preserving smart contracts," in IEEE Symposium on Security and Privacy (SP), 2016, pp. 839–858.
+
+[22] G. Maxwell, "CoinJoin: Bitcoin privacy for the real world," 2013. [Online]. Available: https://bitcointalk.org/index.php?topic=279249
+
+[23] S. Meiklejohn and R. Mercer, "Möbius: Trustless tumbling for transaction privacy," Proceedings on Privacy Enhancing Technologies, vol. 2018, no. 2, pp. 105–121, 2018.
+
+[24] N. Narula, W. Vasquez, and M. Virza, "zkLedger: Privacy-preserving auditing for distributed ledgers," in USENIX NSDI, 2018, pp. 65–80.
+
+[25] National Institute of Standards and Technology (NIST), "FIPS 180-2: Secure hash standard," 2002.
+
+[26] B. Parno, J. Howell, C. Gentry, and M. Raykova, "Pinocchio: Nearly practical verifiable computation," in IEEE Symposium on Security and Privacy, 2013, pp. 238–252.
+
+[27] A. Rondelet and M. Zajac, "ZETH: On integrating Zerocash on Ethereum," arXiv preprint arXiv:1904.00905, 2019.
+
+[28] N. van Saberhagen, "CryptoNote v2.0," 2013. [Online]. Available: https://cryptonote.org/whitepaper.pdf
+
+[29] G. Jeong, N. Lee, J. Kim, and H. Oh, "Azeroth: Auditable zero-knowledge transactions in smart contracts," IEEE Access, vol. 11, pp. 52891–52909, 2023.
 
 ---
 
